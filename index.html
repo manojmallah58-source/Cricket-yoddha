@@ -3,91 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Advanced Pro Player</title>
-    
+    <meta name="referrer" content="no-referrer">
+    <title>Pro Video Player v2.0</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
     <style>
-        :root { --plyr-color-main: #ffb400; } /* Screenshot Yellow */
-        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; }
-        .player-wrapper { width: 100%; height: 100vh; display: flex; align-items: center; }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        
-        /* Screenshot Button Styling */
-        .plyr__control--screenshot svg { width: 20px; height: 20px; }
-        .plyr__controls { background: linear-gradient(transparent, rgba(0,0,0,0.8)) !important; padding: 20px 15px !important; }
+        :root {
+            --plyr-color-main: #ffb400; /* Screenshot Matching Yellow */
+            --plyr-video-background: #000;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: #000;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        .player-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Screenshot style controls */
+        .plyr__controls {
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.9)) !important;
+            padding: 25px 15px 15px !important;
+        }
+
+        /* Quality selector styling */
+        .plyr__menu__container {
+            background: rgba(26, 26, 26, 0.95) !important;
+            border-radius: 8px !important;
+        }
+
+        video { object-fit: contain; }
     </style>
 </head>
 <body>
 
-<div class="player-wrapper">
+<div class="player-container">
     <video id="player" playsinline crossorigin="anonymous"></video>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
     const video = document.getElementById('player');
     const source = new URLSearchParams(window.location.search).get('url');
 
-    const controls = [
-        'play-large', 'play', 'progress', 'current-time', 'duration', 
-        'mute', 'volume', 'settings', 'pip', 'fullscreen'
+    // Controls set as per screenshot + Quality options
+    const defaultControls = [
+        'play-large', 'play', 'progress', 'current-time', 
+        'duration', 'mute', 'volume', 'settings', 'fullscreen'
     ];
 
-    const player = new Plyr(video, { controls, tooltips: { controls: true } });
+    if (Hls.isSupported() && source) {
+        const hls = new Hls();
+        hls.loadSource(source);
+        hls.attachMedia(video);
 
-    // --- Camera (Screenshot) Logic ---
-    function addScreenshotButton() {
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            // Quality levels detect karna
+            const availableQualities = hls.levels.map(l => l.height);
+            availableQualities.unshift(0); // Add 'Auto' option
+
+            const player = new Plyr(video, {
+                controls: defaultControls,
+                settings: ['quality', 'speed'],
+                quality: {
+                    default: 0, // Auto
+                    options: availableQualities,
+                    forced: true,
+                    onChange: (newQuality) => {
+                        if (newQuality === 0) {
+                            hls.currentLevel = -1; // Auto quality
+                        } else {
+                            hls.levels.forEach((level, levelIndex) => {
+                                if (level.height === newQuality) {
+                                    hls.currentLevel = levelIndex;
+                                }
+                            });
+                        }
+                    }
+                },
+                i18n: { quality: 'Quality', auto: 'Auto' }
+            });
+
+            // Camera (Screenshot) Button logic
+            addScreenshotButton(player);
+        });
+
+        window.hls = hls;
+    } else {
+        // Safari/iOS native fallback
+        video.src = source;
+        new Plyr(video, { controls: defaultControls });
+    }
+
+    function addScreenshotButton(player) {
         const controlBar = document.querySelector('.plyr__controls');
-        if (!controlBar || document.querySelector('.plyr__control--screenshot')) return;
-
         const camBtn = document.createElement('button');
         camBtn.type = 'button';
-        camBtn.className = 'plyr__control plyr__control--screenshot';
-        camBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`;
+        camBtn.className = 'plyr__control';
+        camBtn.style.padding = '10px';
+        camBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+            </svg>`;
+        
         camBtn.onclick = () => {
             try {
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
+                canvas.getContext('2d').drawImage(video, 0, 0);
                 const link = document.createElement('a');
-                link.download = `Shot_${new Date().getTime()}.png`;
+                link.download = `Live_Shot_${new Date().getTime()}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
-            } catch (err) {
-                alert("Security Error: Stream provider screenshot allow nahi kar raha.");
-                console.error(err);
+            } catch (e) {
+                alert("Screenshot error: Cross-origin restriction.");
             }
         };
 
         const settingsBtn = controlBar.querySelector('[data-plyr="settings"]');
         controlBar.insertBefore(camBtn, settingsBtn);
     }
-
-    if (Hls.isSupported() && source) {
-        const hls = new Hls();
-        hls.loadSource(source);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            const qualities = hls.levels.map(l => l.height);
-            player.config.quality = {
-                default: qualities[0],
-                options: qualities,
-                forced: true,
-                onChange: (q) => hls.levels.forEach((l, i) => { if (l.height === q) hls.currentLevel = i; })
-            };
-            addScreenshotButton();
-        });
-    } else {
-        video.src = source;
-        video.onplay = addScreenshotButton;
-    }
-});
 </script>
+
 </body>
 </html>
+
