@@ -4,9 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="referrer" content="no-referrer">
-<title>@Cricket Yoddha</title>
+<title>Video Player</title>
 
-<!-- Plyr + HLS.js -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
@@ -18,131 +17,76 @@
     height: 100%;
     background: black;
     font-family: sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   #player-container {
     width: 100%;
-    max-width: 1000px;
-    margin: 0 auto;
+    max-width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
 
-  /* 16:9 responsive video */
-  #plyr-player {
-    width: 100%;
-    aspect-ratio: 16 / 9;
+  /* Screenshot jaisa UI banane ke liye custom styling */
+  .plyr--video {
     background: black;
   }
 
-  /* Telegram button */
-  #telegramButton {
-    display: block;
-    width: 220px;
-    margin: 15px auto;
-    padding: 12px 20px;
-    background: #0088cc;
-    color: #fff;
-    font-size: 16px;
-    font-weight: bold;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    transition: background 0.3s, transform 0.2s;
+  /* Bottom controls bar styling */
+  .plyr__controls {
+    background: rgba(0, 0, 0, 0.7) !important;
+    padding: 10px 15px !important;
   }
 
-  #telegramButton:hover {
-    background: #00a2e8;
-    transform: scale(1.05);
+  /* Seek bar (yellow/orange color) */
+  .plyr--full-ui input[type=range] {
+    color: #ffb400 !important;
   }
 
-  /* Popup styles */
-  #popup-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(0,0,0,0.7);
-    z-index: 9999;
+  .plyr__control--overlaid {
+    background: rgba(255, 180, 0, 0.8) !important;
   }
 
-  .modal {
-    background: #1e1e1e;
-    padding: 25px 30px;
-    border-radius: 12px;
-    text-align: center;
-    color: #fff;
-    max-width: 300px;
-    width: 90%;
-    box-shadow: 0 0 20px rgba(0, 136, 204, 0.5);
-    animation: fadeIn 0.3s ease;
-  }
-
-  .modal h2 {
-    margin-top: 0;
-    color: #0088cc;
-  }
-
-  .modal button {
-    margin: 10px 5px 0;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 14px;
-  }
-
-  #joinButton {
-    background: #0088cc;
-    color: #fff;
-  }
-
-  #joinButton:hover {
-    background: #00a2e8;
-  }
-
-  #closeButton {
-    background: #444;
-    color: #fff;
-  }
-
-  @keyframes fadeIn {
-    from {opacity: 0; transform: scale(0.95);}
-    to {opacity: 1; transform: scale(1);}
-  }
-
-  /* Fullscreen styling to maintain 16:9 */
-  :fullscreen #plyr-player,
-  :-webkit-full-screen #plyr-player {
+  /* Video ko center mein rakhne ke liye */
+  video {
     width: 100%;
     height: auto;
-    max-height: 100vh;
-    aspect-ratio: 16 / 9;
-    margin: auto;
-    display: block;
   }
 </style>
 </head>
 <body>
 
 <div id="player-container">
-  <video id="plyr-player" controls playsinline></video>
-  <button id="telegramButton">Join Telegram </button>
+  <video id="plyr-player" playsinline crossorigin></video>
 </div>
 
 <script>
-  // --- Plyr + HLS Setup ---
   function getQueryParam(param) {
     return new URLSearchParams(window.location.search).get(param);
   }
 
   const videoSrc = getQueryParam('url');
   const video = document.getElementById('plyr-player');
+
+  // Player controls set karna (Screenshot ke hisaab se)
+  const controls = [
+    'play-large', 
+    'restart', 
+    'play', 
+    'progress', 
+    'current-time', 
+    'duration', 
+    'mute', 
+    'volume', 
+    'captions', 
+    'settings', 
+    'pip', 
+    'fullscreen'
+  ];
 
   if (Hls.isSupported()) {
     const hls = new Hls();
@@ -152,10 +96,8 @@
     hls.on(Hls.Events.MANIFEST_PARSED, function () {
       const availableQualities = hls.levels.map(l => l.height).filter((v,i,a) => a.indexOf(v)===i);
 
-      const player = new Plyr(video, {
-        autoplay: true,
-        muted: true,
-        settings: ['quality', 'speed', 'loop'],
+      new Plyr(video, {
+        controls,
         quality: {
           default: availableQualities[0],
           options: availableQualities,
@@ -167,66 +109,15 @@
           }
         }
       });
-
-      if (availableQualities.length) hls.currentLevel = hls.levels.length - 1;
     });
   } else {
     video.src = videoSrc;
-    new Plyr(video, { autoplay: true, muted: true });
+    new Plyr(video, { controls });
   }
 
-  // --- Telegram popup ---
-  window.addEventListener("load", function () {
-    const container = document.createElement('div');
-    container.id = 'popup-container';
-    document.body.appendChild(container);
-
-    const popup = document.createElement('div');
-    popup.classList.add('modal');
-
-    popup.innerHTML = `
-      <h2>Support Us!</h2>
-      <p>Join our Telegram channel <br><strong>@Cricket Yoddha</strong> for more updates.</p>
-      <button id="joinButton">Join Now</button>
-      <button id="closeButton">Already Joined</button>
-    `;
-
-    container.appendChild(popup);
-
-    popup.querySelector('#joinButton').onclick = () => {
-      window.open("https://t.me/+rwZKMV0-L8wyOTll", "_blank");
-      container.remove();
-    };
-    popup.querySelector('#closeButton').onclick = () => container.remove();
-  });
-
-  // --- Telegram button under player ---
-  document.getElementById('telegramButton').onclick = () => {
-    window.open("https://t.me/+rwZKMV0-L8wyOTll", "_blank");
-  };
-
-  // --- Fullscreen landscape ---
-  function lockLandscape() {
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {});
-    }
-  }
-
-  function unlockOrientation() {
-    if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
-  }
-
-  function handleFullscreenChange() {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-      lockLandscape();
-    } else {
-      unlockOrientation();
-    }
-  }
-
-  document.addEventListener('fullscreenchange', handleFullscreenChange);
-  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+  // Telegram popup ka saara code yahan se hata diya gaya hai.
 </script>
 
 </body>
 </html>
+
