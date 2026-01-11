@@ -1,123 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="referrer" content="no-referrer">
-<title>Video Player</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Professional Video Player</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <style>
+        :root {
+            --plyr-color-main: #ffb400; /* Screenshot jaisa Yellow color */
+            --plyr-video-background: #000;
+        }
 
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    background: black;
-    font-family: sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+        body, html {
+            margin: 0; padding: 0;
+            background-color: #000;
+            height: 100%; width: 100%;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
 
-  #player-container {
-    width: 100%;
-    max-width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
+        .player-wrapper {
+            width: 100%;
+            max-width: 100%;
+            position: relative;
+        }
 
-  /* Screenshot jaisa UI banane ke liye custom styling */
-  .plyr--video {
-    background: black;
-  }
+        /* Screenshot ke jaisa Custom Styling */
+        .plyr--video {
+            height: 100vh;
+        }
 
-  /* Bottom controls bar styling */
-  .plyr__controls {
-    background: rgba(0, 0, 0, 0.7) !important;
-    padding: 10px 15px !important;
-  }
+        .plyr__controls {
+            background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.8)) !important;
+            padding: 20px 15px 10px !important;
+        }
 
-  /* Seek bar (yellow/orange color) */
-  .plyr--full-ui input[type=range] {
-    color: #ffb400 !important;
-  }
+        /* Seekbar Thumb and Progress */
+        .plyr__progress__container input[type=range] {
+            cursor: pointer;
+        }
 
-  .plyr__control--overlaid {
-    background: rgba(255, 180, 0, 0.8) !important;
-  }
+        /* Custom Icons Color */
+        .plyr__control svg {
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+        }
 
-  /* Video ko center mein rakhne ke liye */
-  video {
-    width: 100%;
-    height: auto;
-  }
-</style>
+        /* Time Display */
+        .plyr__time {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        canvas { display: none; } /* Screenshot capture ke liye */
+    </style>
 </head>
 <body>
 
-<div id="player-container">
-  <video id="plyr-player" playsinline crossorigin></video>
+<div class="player-wrapper">
+    <video id="player" playsinline crossorigin></video>
 </div>
 
 <script>
-  function getQueryParam(param) {
-    return new URLSearchParams(window.location.search).get(param);
-  }
+document.addEventListener('DOMContentLoaded', () => {
+    const video = document.getElementById('player');
+    const urlParams = new URLSearchParams(window.location.search);
+    const source = urlParams.get('url') || 'YOUR_DEFAULT_M3U8_URL_HERE';
 
-  const videoSrc = getQueryParam('url');
-  const video = document.getElementById('plyr-player');
+    // Player Controls Configuration (Screenshot Matching)
+    const controls = [
+        'play-large',
+        'rewind',
+        'play',
+        'progress',
+        'current-time',
+        'duration',
+        'mute',
+        'volume',
+        'captions',
+        'settings',
+        'pip',
+        'fullscreen'
+    ];
 
-  // Player controls set karna (Screenshot ke hisaab se)
-  const controls = [
-    'play-large', 
-    'restart', 
-    'play', 
-    'progress', 
-    'current-time', 
-    'duration', 
-    'mute', 
-    'volume', 
-    'captions', 
-    'settings', 
-    'pip', 
-    'fullscreen'
-  ];
-
-  if (Hls.isSupported()) {
-    const hls = new Hls();
-    hls.loadSource(videoSrc);
-    hls.attachMedia(video);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-      const availableQualities = hls.levels.map(l => l.height).filter((v,i,a) => a.indexOf(v)===i);
-
-      new Plyr(video, {
+    // Initialize Plyr
+    const player = new Plyr(video, {
         controls,
-        quality: {
-          default: availableQualities[0],
-          options: availableQualities,
-          forced: true,
-          onChange: (newQuality) => {
-            hls.levels.forEach((level, levelIndex) => {
-              if (level.height === newQuality) hls.currentLevel = levelIndex;
-            });
-          }
-        }
-      });
+        tooltips: { controls: true, seek: true },
+        displayDuration: true,
+        invertTime: false,
+        ratio: '16:9'
     });
-  } else {
-    video.src = videoSrc;
-    new Plyr(video, { controls });
-  }
 
-  // Telegram popup ka saara code yahan se hata diya gaya hai.
+    // Camera Icon (Screenshot) Feature add karna
+    const controlContainer = document.querySelector('.plyr__controls');
+    const screenshotBtn = document.createElement('button');
+    screenshotBtn.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`;
+    screenshotBtn.className = 'plyr__control';
+    screenshotBtn.type = 'button';
+    screenshotBtn.setAttribute('data-plyr', 'screenshot');
+    screenshotBtn.onclick = takeScreenshot;
+    
+    // Settings button ke pehle insert karein
+    const settingsBtn = document.querySelector('.plyr__controls > [data-plyr="settings"]');
+    controlContainer.insertBefore(screenshotBtn, settingsBtn);
+
+    function takeScreenshot() {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const link = document.createElement('a');
+        link.download = 'screenshot.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+
+    // HLS Support
+    if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(source);
+        hls.attachMedia(video);
+        window.hls = hls;
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+            const availableQualities = hls.levels.map((l) => l.height);
+            player.config.quality = {
+                default: availableQualities[0],
+                options: availableQualities,
+                forced: true,
+                onChange: (e) => updateQuality(e),
+            };
+        });
+    } else {
+        video.src = source;
+    }
+
+    function updateQuality(newQuality) {
+        window.hls.levels.forEach((level, levelIndex) => {
+            if (level.height === newQuality) {
+                window.hls.currentLevel = levelIndex;
+            }
+        });
+    }
+});
 </script>
 
 </body>
 </html>
+
 
