@@ -1,167 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="referrer" content="no-referrer">
-<title>Cricket Yoddha | Premium</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="referrer" content="no-referrer">
+    <title>Cricket Yoddha Premium</title>
 
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
-<style>
-  /* Premium Dark Theme */
-  :root {
-    --plyr-color-main: #ff0000;
-    --player-bg: #000;
-  }
+    <style>
+        :root { --plyr-color-main: #ff0000; }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background: #000; display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
 
-  html, body {
-    margin: 0; padding: 0; height: 100%; width: 100%;
-    background: var(--player-bg);
-    display: flex; justify-content: center; align-items: center;
-    overflow: hidden;
-    font-family: 'Inter', -apple-system, sans-serif;
-  }
+        #video-container { width: 100%; max-width: 1000px; line-height: 0; }
+        
+        /* Modern UI Fixes */
+        .plyr { border-radius: 0; box-shadow: 0 0 30px rgba(0,0,0,0.5); aspect-ratio: 16/9; }
+        
+        /* Screenshot Button Styling */
+        .plyr__control--screenshot svg { width: 20px !important; height: 20px !important; }
+        
+        /* Speed Optimization: Hide video until UI is ready */
+        video { opacity: 0; transition: opacity 0.3s ease; }
+        video.ready { opacity: 1; }
 
-  #player-container {
-    width: 100%;
-    max-width: 100%;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    background: #000;
-  }
-
-  /* Aspect Ratio 16:9 for Mobile Centering */
-  .plyr {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    border-radius: 0px;
-  }
-
-  /* Glassmorphism Controls */
-  .plyr__controls {
-    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.8)) !important;
-    padding: 20px 10px 10px !important;
-  }
-
-  /* Screenshot Button Styling */
-  .plyr__control--screenshot svg {
-    width: 19px !important;
-    height: 19px !important;
-    transition: transform 0.2s ease;
-  }
-
-  .plyr__control--screenshot:active svg {
-    transform: scale(0.8);
-  }
-
-  /* Hidden Canvas */
-  #canvas-capture { display: none; }
-
-  /* Loading Spinner Unique Design */
-  .plyr--loading::after {
-    border-color: var(--plyr-color-main) transparent transparent !important;
-  }
-</style>
+        canvas { display: none; }
+    </style>
 </head>
 <body>
 
-<div id="player-container">
-  <video id="plyr-player" controls playsinline crossorigin="anonymous"></video>
+<div id="video-container">
+    <video id="player" playsinline controls crossorigin="anonymous"></video>
 </div>
 
-<canvas id="canvas-capture"></canvas>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+<canvas id="screenshot-canvas"></canvas>
 
 <script>
-  const video = document.getElementById('plyr-player');
-  const canvas = document.getElementById('canvas-capture');
-  const urlParam = new URLSearchParams(window.location.search).get('url');
+    const video = document.getElementById('player');
+    const canvas = document.getElementById('screenshot-canvas');
+    const urlParam = new URLSearchParams(window.location.search).get('url');
 
-  // --- Optimization: Fast HLS Loading ---
-  if (urlParam) {
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        debug: false,
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90, // Better buffering
-        capLevelToPlayerSize: true
-      });
-      hls.loadSource(urlParam);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => initPlyr());
-    } else {
-      video.src = urlParam;
-      initPlyr();
+    // 1. FAST HLS CONFIG
+    if (urlParam) {
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                capLevelToPlayerSize: true,
+                startLevel: -1 // Auto-quality start
+            });
+            hls.loadSource(urlParam);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.classList.add('ready');
+                initPlayer();
+            });
+        } else {
+            video.src = urlParam;
+            video.classList.add('ready');
+            initPlayer();
+        }
     }
-  }
 
-  function initPlyr() {
-    const player = new Plyr(video, {
-      autoplay: true,
-      quality: { default: 720, options: [1080, 720, 480, 360] },
-      controls: [
-        'play-large', 'play', 'progress', 'current-time', 
-        'mute', 'volume', 'settings', 'fullscreen'
-      ],
-      tooltips: { controls: true, seek: true }
-    });
+    // 2. PLAYER UI CONFIG
+    function initPlayer() {
+        const player = new Plyr(video, {
+            autoplay: true,
+            muted: true,
+            settings: ['quality', 'speed'],
+            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen']
+        });
 
-    // --- Inject Screenshot Button near Settings ---
-    player.on('ready', () => {
-      const controlBar = document.querySelector('.plyr__controls');
-      const settingsBtn = document.querySelector('[data-plyr="settings"]');
+        // 3. INJECT SCREENSHOT BUTTON (SETTINGS KE BAJU MEIN)
+        player.on('ready', () => {
+            const controls = document.querySelector('.plyr__controls');
+            const settingsBtn = document.querySelector('[data-plyr="settings"]');
 
-      if (settingsBtn && !document.querySelector('.plyr__control--screenshot')) {
-        const ssBtn = document.createElement('button');
-        ssBtn.type = 'button';
-        ssBtn.className = 'plyr__control plyr__control--screenshot';
-        ssBtn.setAttribute('data-plyr', 'screenshot');
-        ssBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>`;
-        
-        // Placement: Just before settings gear icon
-        settingsBtn.before(ssBtn);
+            if (settingsBtn && !document.querySelector('.plyr__control--screenshot')) {
+                const ssBtn = document.createElement('button');
+                ssBtn.type = 'button';
+                ssBtn.className = 'plyr__control plyr__control--screenshot';
+                ssBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>`;
+                
+                settingsBtn.before(ssBtn);
 
-        ssBtn.onclick = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          try {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `CricketYoddha_SS_${Date.now()}.png`;
-            link.href = dataUrl;
-            link.click();
-          } catch(e) {
-            alert("Error: Video Security (CORS) blocked screenshot.");
-          }
-        };
-      }
-    });
-  }
-
-  // --- Advance Screen Orientation Logic ---
-  const handleOrientation = () => {
-    if (document.fullscreenElement) {
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
-      }
-    } else {
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
+                ssBtn.onclick = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    try {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const link = document.createElement('a');
+                        link.download = `Cricket_Yoddha_${Date.now()}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    } catch(e) { alert("CORS Block: Can't snap this source."); }
+                };
+            }
+        });
     }
-  };
 
-  document.addEventListener('fullscreenchange', handleOrientation);
+    // 4. AUTO LANDSCAPE
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement && screen.orientation) {
+            screen.orientation.lock('landscape').catch(() => {});
+        } else {
+            screen.orientation.unlock();
+        }
+    });
 </script>
 
 </body>
