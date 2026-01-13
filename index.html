@@ -4,14 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<title>Cricket Yoddha | Live Player</title>
+<title>Cricket Yoddha | Professional Player</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
 <style>
-  /* Professional Dark Theme & Centering */
   html, body {
     margin: 0;
     padding: 0;
@@ -22,64 +21,39 @@
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    font-family: 'Segoe UI', Roboto, sans-serif;
   }
 
   #player-container {
     width: 100%;
-    max-width: 100%;
-    height: auto;
+    max-width: 1000px;
     position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
   }
 
-  /* 16:9 Aspect Ratio Control */
   .video-wrapper {
     width: 100%;
-    max-width: 1000px;
     aspect-ratio: 16 / 9;
-    background: #000;
-    box-shadow: 0 0 40px rgba(0,0,0,0.8);
   }
 
-  video {
-    width: 100%;
-    height: 100%;
+  /* Custom Screenshot Button in Control Bar */
+  .plyr__controls {
+    gap: 5px;
   }
 
-  /* Professional Screenshot Button */
-  .ss-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
-    padding: 10px;
-    border-radius: 50%;
-    cursor: pointer;
-    backdrop-filter: blur(5px);
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .plyr__control--screenshot {
+    order: 6; /* Positioned near settings/quality */
   }
 
-  .ss-btn:active {
-    transform: scale(0.9);
-    background: rgba(255, 255, 255, 0.2);
+  .plyr__control--screenshot svg {
+    width: 18px;
+    height: 18px;
   }
 
-  /* Hiding elements for clean UI */
-  #canvas-capture { display: none; }
-
-  /* Red accent for professional feel */
+  /* Red Theme */
   .plyr--full-ui {
-    --plyr-color-main: #e50914; 
+    --plyr-color-main: #ff0000;
   }
+
+  #canvas-capture { display: none; }
 </style>
 </head>
 <body>
@@ -88,13 +62,6 @@
   <div class="video-wrapper">
     <video id="plyr-player" controls playsinline crossorigin="anonymous"></video>
   </div>
-  
-  <button class="ss-btn" id="takeScreenshot" title="Take Screenshot">
-    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-      <circle cx="12" cy="13" r="4"></circle>
-    </svg>
-  </button>
 </div>
 
 <canvas id="canvas-capture"></canvas>
@@ -102,9 +69,7 @@
 <script>
   const video = document.getElementById('plyr-player');
   const canvas = document.getElementById('canvas-capture');
-  const ssBtn = document.getElementById('takeScreenshot');
 
-  // URL se m3u8 link uthane ke liye
   const urlParams = new URLSearchParams(window.location.search);
   const m3u8Url = urlParams.get('url');
 
@@ -114,48 +79,64 @@
       hls.loadSource(m3u8Url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        initializePlayer();
+        setupPlayer();
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // For Safari/iOS
       video.src = m3u8Url;
-      initializePlayer();
+      setupPlayer();
     }
   }
 
-  function initializePlayer() {
+  function setupPlayer() {
+    // Custom Control bar with Screenshot button
+    const controls = [
+      'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 
+      'captions', 'settings', 'pip', 'airplay', 'fullscreen'
+    ];
+
     const player = new Plyr(video, {
       autoplay: true,
-      keyboard: { focused: true, global: true },
-      tooltips: { controls: true, seek: true },
-      captions: { active: true, update: true }
+      controls: controls,
+      settings: ['quality', 'speed']
     });
+
+    // Control bar mein camera button insert karna
+    const controlBar = document.querySelector('.plyr__controls');
+    if (controlBar) {
+      const ssBtn = document.createElement('button');
+      ssBtn.type = 'button';
+      ssBtn.className = 'plyr__control plyr__control--screenshot';
+      ssBtn.setAttribute('aria-label', 'Take Screenshot');
+      ssBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>`;
+      
+      // Settings button ke pehle (left mein) button lagana
+      const settingsBtn = controlBar.querySelector('[data-plyr="settings"]');
+      controlBar.insertBefore(ssBtn, settingsBtn);
+
+      ssBtn.onclick = () => takeScreenshot();
+    }
   }
 
-  // --- Screenshot Logic ---
-  ssBtn.onclick = () => {
+  function takeScreenshot() {
     const ctx = canvas.getContext('2d');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const link = document.createElement('a');
-      link.download = `Cricket_Yoddha_Snap_${Date.now()}.png`;
+      link.download = `CricketYoddha_${Date.now()}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (e) {
-      alert("CORS Error: Video security prevents screenshots.");
+      alert("CORS Error: Video provider privacy prevents screenshots.");
     }
-  };
+  }
 
-  // --- Automatic Fullscreen & Landscape Logic ---
-  video.onplay = () => {
-    // Attempt to lock landscape when video starts if already in FS
-    if (document.fullscreenElement && screen.orientation) {
-      screen.orientation.lock('landscape').catch(() => {});
-    }
-  };
-
+  // Auto Landscape Logic
   document.addEventListener('fullscreenchange', () => {
     if (document.fullscreenElement) {
       screen.orientation.lock('landscape').catch(() => {});
