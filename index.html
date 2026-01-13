@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="referrer" content="no-referrer">
-    <title>Cricket Yoddha Premium</title>
+    <title>Cricket Yoddha | High Quality</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -18,16 +18,15 @@
             overflow: hidden;
         }
 
-        #video-container { width: 100%; max-width: 1000px; line-height: 0; }
+        #video-container { width: 100%; max-width: 1000px; }
         
-        /* Modern UI Fixes */
-        .plyr { border-radius: 0; box-shadow: 0 0 30px rgba(0,0,0,0.5); aspect-ratio: 16/9; }
+        /* Modern Player UI */
+        .plyr { aspect-ratio: 16/9; background: #000; }
         
-        /* Screenshot Button Styling */
-        .plyr__control--screenshot svg { width: 20px !important; height: 20px !important; }
+        /* Screenshot Button UI */
+        .plyr__control--screenshot svg { width: 20px !important; height: 20px !important; stroke: white; }
         
-        /* Speed Optimization: Hide video until UI is ready */
-        video { opacity: 0; transition: opacity 0.3s ease; }
+        video { opacity: 0; transition: opacity 0.5s ease; }
         video.ready { opacity: 1; }
 
         canvas { display: none; }
@@ -46,20 +45,21 @@
     const canvas = document.getElementById('screenshot-canvas');
     const urlParam = new URLSearchParams(window.location.search).get('url');
 
-    // 1. FAST HLS CONFIG
     if (urlParam) {
         if (Hls.isSupported()) {
             const hls = new Hls({
                 enableWorker: true,
                 lowLatencyMode: true,
-                capLevelToPlayerSize: true,
-                startLevel: -1 // Auto-quality start
+                backBufferLength: 90
             });
             hls.loadSource(urlParam);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                // Quality Levels ko automatic fetch karna
+                const availableQualities = data.levels.map(l => l.height);
+                initPlayer(availableQualities, hls);
                 video.classList.add('ready');
-                initPlayer();
             });
         } else {
             video.src = urlParam;
@@ -68,26 +68,36 @@
         }
     }
 
-    // 2. PLAYER UI CONFIG
-    function initPlayer() {
+    function initPlayer(qualities = [], hlsInstance = null) {
         const player = new Plyr(video, {
             autoplay: true,
-            muted: true,
             settings: ['quality', 'speed'],
+            quality: {
+                default: qualities[0] || 720,
+                options: qualities,
+                forced: true,
+                onChange: (newQuality) => {
+                    if (hlsInstance) {
+                        hlsInstance.levels.forEach((level, levelIndex) => {
+                            if (level.height === newQuality) {
+                                hlsInstance.currentLevel = levelIndex;
+                            }
+                        });
+                    }
+                }
+            },
             controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen']
         });
 
-        // 3. INJECT SCREENSHOT BUTTON (SETTINGS KE BAJU MEIN)
+        // Screenshot Button Injection
         player.on('ready', () => {
-            const controls = document.querySelector('.plyr__controls');
             const settingsBtn = document.querySelector('[data-plyr="settings"]');
-
             if (settingsBtn && !document.querySelector('.plyr__control--screenshot')) {
                 const ssBtn = document.createElement('button');
                 ssBtn.type = 'button';
                 ssBtn.className = 'plyr__control plyr__control--screenshot';
                 ssBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                         <circle cx="12" cy="13" r="4"></circle>
                     </svg>`;
@@ -100,22 +110,27 @@
                     const ctx = canvas.getContext('2d');
                     try {
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const link = document.createElement('a');
-                        link.download = `Cricket_Yoddha_${Date.now()}.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                    } catch(e) { alert("CORS Block: Can't snap this source."); }
+                        const imageData = canvas.toDataURL('image/png');
+                        
+                        // Gallery mein save karne ke liye direct download trigger
+                        const downloadLink = document.createElement('a');
+                        downloadLink.download = `CricketYoddha_Live_${Date.now()}.png`;
+                        downloadLink.href = imageData;
+                        downloadLink.click();
+                    } catch(e) { 
+                        alert("Note: Quality change settings and Screenshot depends on your m3u8 link's CORS policy."); 
+                    }
                 };
             }
         });
     }
 
-    // 4. AUTO LANDSCAPE
+    // Auto-Landscape Mode
     document.addEventListener('fullscreenchange', () => {
         if (document.fullscreenElement && screen.orientation) {
             screen.orientation.lock('landscape').catch(() => {});
         } else {
-            screen.orientation.unlock();
+            if (screen.orientation.unlock) screen.orientation.unlock();
         }
     });
 </script>
