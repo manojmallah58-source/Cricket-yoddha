@@ -2,173 +2,168 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<title>Cricket Yoddha Player</title>
+<title>Cricket Yoddha | Live Player</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
 <style>
-  /* Page centering logic */
+  /* Professional Dark Theme & Centering */
   html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    background: #0f0f0f; /* Darker professional background */
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    width: 100%;
+    background-color: #000;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, sans-serif;
   }
 
   #player-container {
-    width: 95%;
-    max-width: 900px;
-    padding: 10px;
-  }
-
-  /* 16:9 aspect ratio for player */
-  #plyr-player {
     width: 100%;
-    border-radius: 12px; /* Smooth corners */
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  }
-
-  /* Button Container */
-  .controls-row {
+    max-width: 100%;
+    height: auto;
+    position: relative;
     display: flex;
-    gap: 10px;
     justify-content: center;
-    margin-top: 20px;
+    align-items: center;
   }
 
-  /* Professional Buttons */
-  .action-btn {
-    flex: 1;
-    max-width: 180px;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
+  /* 16:9 Aspect Ratio Control */
+  .video-wrapper {
+    width: 100%;
+    max-width: 1000px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Professional Screenshot Button */
+  .ss-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 10px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 14px;
-    transition: all 0.3s ease;
-    text-align: center;
-    text-decoration: none;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
   }
 
-  #screenshotBtn {
-    background: #e1e1e1;
-    color: #333;
+  .ss-btn:active {
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.2);
   }
 
-  #screenshotBtn:hover {
-    background: #ffffff;
-  }
+  /* Hiding elements for clean UI */
+  #canvas-capture { display: none; }
 
-  #telegramBtn {
-    background: #0088cc;
-    color: #fff;
-  }
-
-  #telegramBtn:hover {
-    background: #00a2e8;
-  }
-
-  /* Hidden canvas for screenshot */
-  #screenshot-canvas {
-    display: none;
+  /* Red accent for professional feel */
+  .plyr--full-ui {
+    --plyr-color-main: #e50914; 
   }
 </style>
 </head>
 <body>
 
 <div id="player-container">
-  <video id="plyr-player" controls playsinline crossorigin="anonymous"></video>
-  
-  <div class="controls-row">
-    <button id="screenshotBtn" class="action-btn">
-      📸 Take Screenshot
-    </button>
-    <a href="https://t.me/+rwZKMV0-L8wyOTll" target="_blank" id="telegramBtn" class="action-btn">
-      Join Telegram
-    </a>
+  <div class="video-wrapper">
+    <video id="plyr-player" controls playsinline crossorigin="anonymous"></video>
   </div>
+  
+  <button class="ss-btn" id="takeScreenshot" title="Take Screenshot">
+    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+      <circle cx="12" cy="13" r="4"></circle>
+    </svg>
+  </button>
 </div>
 
-<canvas id="screenshot-canvas"></canvas>
+<canvas id="canvas-capture"></canvas>
 
 <script>
   const video = document.getElementById('plyr-player');
-  const canvas = document.getElementById('screenshot-canvas');
-  const screenshotBtn = document.getElementById('screenshotBtn');
+  const canvas = document.getElementById('canvas-capture');
+  const ssBtn = document.getElementById('takeScreenshot');
 
-  // --- Plyr + HLS Setup ---
-  function getQueryParam(param) {
-    return new URLSearchParams(window.location.search).get(param);
+  // URL se m3u8 link uthane ke liye
+  const urlParams = new URLSearchParams(window.location.search);
+  const m3u8Url = urlParams.get('url');
+
+  if (m3u8Url) {
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(m3u8Url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        initializePlayer();
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // For Safari/iOS
+      video.src = m3u8Url;
+      initializePlayer();
+    }
   }
 
-  const videoSrc = getQueryParam('url') || "YOUR_HLS_URL_HERE";
-
-  if (Hls.isSupported()) {
-    const hls = new Hls();
-    hls.loadSource(videoSrc);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-      new Plyr(video, {
-        autoplay: false,
-        settings: ['quality', 'speed']
-      });
+  function initializePlayer() {
+    const player = new Plyr(video, {
+      autoplay: true,
+      keyboard: { focused: true, global: true },
+      tooltips: { controls: true, seek: true },
+      captions: { active: true, update: true }
     });
-  } else {
-    video.src = videoSrc;
-    new Plyr(video);
   }
 
   // --- Screenshot Logic ---
-  screenshotBtn.onclick = function() {
-    const context = canvas.getContext('2d');
-    // Match canvas size to video size
+  ssBtn.onclick = () => {
+    const ctx = canvas.getContext('2d');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
-    // Draw current video frame to canvas
     try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Convert to image and download
-      const dataURL = canvas.toDataURL('image/png');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const link = document.createElement('a');
-      link.download = 'CricketYoddha_Screenshot.png';
-      link.href = dataURL;
+      link.download = `Cricket_Yoddha_Snap_${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (e) {
-      alert("Note: External links may block screenshots due to security (CORS).");
-      console.error(e);
+      alert("CORS Error: Video security prevents screenshots.");
     }
   };
 
-  // --- Auto-lock orientation on Fullscreen ---
-  video.addEventListener('enterfullscreen', () => {
-    if (screen.orientation && screen.orientation.lock) {
+  // --- Automatic Fullscreen & Landscape Logic ---
+  video.onplay = () => {
+    // Attempt to lock landscape when video starts if already in FS
+    if (document.fullscreenElement && screen.orientation) {
       screen.orientation.lock('landscape').catch(() => {});
     }
-  });
+  };
 
-  video.addEventListener('exitfullscreen', () => {
-    if (screen.orientation && screen.orientation.unlock) {
-      screen.orientation.unlock();
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+      screen.orientation.lock('landscape').catch(() => {});
+    } else {
+      if (screen.orientation.unlock) screen.orientation.unlock();
     }
   });
 </script>
 
 </body>
 </html>
-
