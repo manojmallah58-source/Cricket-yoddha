@@ -1,146 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="referrer" content="no-referrer">
-    <title>Advanced Pro Player</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<title>Cricket Yoddha Player</title>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
-    <style>
-        :root {
-            --plyr-color-main: #ffb400; /* Screenshot Yellow */
-            --plyr-video-background: #000;
-        }
+<style>
+  /* Page centering logic */
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0f0f0f; /* Darker professional background */
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
 
-        body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background-color: #000;
-            display: flex; align-items: center; justify-content: center;
-            overflow: hidden;
-        }
+  #player-container {
+    width: 95%;
+    max-width: 900px;
+    padding: 10px;
+  }
 
-        /* Loading Screen Fix */
-        #loading-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-            transition: opacity 0.5s ease;
-        }
+  /* 16:9 aspect ratio for player */
+  #plyr-player {
+    width: 100%;
+    border-radius: 12px; /* Smooth corners */
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
 
-        .spinner {
-            width: 50px; height: 50px;
-            border: 5px solid #333;
-            border-top: 5px solid #ffb400;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+  /* Button Container */
+  .controls-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+  }
 
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  /* Professional Buttons */
+  .action-btn {
+    flex: 1;
+    max-width: 180px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
 
-        .player-container {
-            width: 100%; height: 100%;
-            display: flex; align-items: center;
-            opacity: 0; /* Starting mein hidden rahega */
-            transition: opacity 0.5s ease;
-        }
+  #screenshotBtn {
+    background: #e1e1e1;
+    color: #333;
+  }
 
-        .plyr__controls {
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.9)) !important;
-            padding: 25px 15px 15px !important;
-        }
+  #screenshotBtn:hover {
+    background: #ffffff;
+  }
 
-        video { object-fit: contain; }
-    </style>
+  #telegramBtn {
+    background: #0088cc;
+    color: #fff;
+  }
+
+  #telegramBtn:hover {
+    background: #00a2e8;
+  }
+
+  /* Hidden canvas for screenshot */
+  #screenshot-canvas {
+    display: none;
+  }
+</style>
 </head>
 <body>
 
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-    </div>
+<div id="player-container">
+  <video id="plyr-player" controls playsinline crossorigin="anonymous"></video>
+  
+  <div class="controls-row">
+    <button id="screenshotBtn" class="action-btn">
+      📸 Take Screenshot
+    </button>
+    <a href="https://t.me/+rwZKMV0-L8wyOTll" target="_blank" id="telegramBtn" class="action-btn">
+      Join Telegram
+    </a>
+  </div>
+</div>
 
-    <div class="player-container" id="main-player">
-        <video id="player" playsinline crossorigin="anonymous"></video>
-    </div>
+<canvas id="screenshot-canvas"></canvas>
 
 <script>
-    const video = document.getElementById('player');
-    const loading = document.getElementById('loading-overlay');
-    const playerDiv = document.getElementById('main-player');
-    const source = new URLSearchParams(window.location.search).get('url');
+  const video = document.getElementById('plyr-player');
+  const canvas = document.getElementById('screenshot-canvas');
+  const screenshotBtn = document.getElementById('screenshotBtn');
 
-    const controls = [
-        'play-large', 'play', 'progress', 'current-time', 
-        'duration', 'mute', 'volume', 'settings', 'fullscreen'
-    ];
+  // --- Plyr + HLS Setup ---
+  function getQueryParam(param) {
+    return new URLSearchParams(window.location.search).get(param);
+  }
 
-    function showPlayer() {
-        loading.style.opacity = '0';
-        setTimeout(() => {
-            loading.style.display = 'none';
-            playerDiv.style.opacity = '1';
-        }, 500);
+  const videoSrc = getQueryParam('url') || "YOUR_HLS_URL_HERE";
+
+  if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(videoSrc);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+      new Plyr(video, {
+        autoplay: false,
+        settings: ['quality', 'speed']
+      });
+    });
+  } else {
+    video.src = videoSrc;
+    new Plyr(video);
+  }
+
+  // --- Screenshot Logic ---
+  screenshotBtn.onclick = function() {
+    const context = canvas.getContext('2d');
+    // Match canvas size to video size
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw current video frame to canvas
+    try {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert to image and download
+      const dataURL = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = 'CricketYoddha_Screenshot.png';
+      link.href = dataURL;
+      link.click();
+    } catch (e) {
+      alert("Note: External links may block screenshots due to security (CORS).");
+      console.error(e);
     }
+  };
 
-    if (Hls.isSupported() && source) {
-        const hls = new Hls();
-        hls.loadSource(source);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            const qualities = hls.levels.map(l => l.height);
-            qualities.unshift(0); 
-
-            const player = new Plyr(video, {
-                controls,
-                quality: {
-                    default: 0,
-                    options: qualities,
-                    forced: true,
-                    onChange: (q) => {
-                        if (q === 0) hls.currentLevel = -1;
-                        else hls.levels.forEach((l, i) => { if (l.height === q) hls.currentLevel = i; });
-                    }
-                }
-            });
-
-            // Camera Button
-            addCamBtn();
-            
-            // Jab video ready ho jaye tabhi dikhao
-            player.on('ready', showPlayer);
-        });
-    } else {
-        video.src = source;
-        const player = new Plyr(video, { controls });
-        player.on('ready', showPlayer);
+  // --- Auto-lock orientation on Fullscreen ---
+  video.addEventListener('enterfullscreen', () => {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
     }
+  });
 
-    function addCamBtn() {
-        const bar = document.querySelector('.plyr__controls');
-        if (!bar) return;
-        const btn = document.createElement('button');
-        btn.className = 'plyr__control';
-        btn.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`;
-        btn.onclick = () => {
-            const c = document.createElement('canvas');
-            c.width = video.videoWidth; c.height = video.videoHeight;
-            c.getContext('2d').drawImage(video, 0, 0);
-            const a = document.createElement('a');
-            a.download = 'Screenshot.png'; a.href = c.toDataURL(); a.click();
-        };
-        bar.insertBefore(btn, bar.querySelector('[data-plyr="settings"]'));
+  video.addEventListener('exitfullscreen', () => {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock();
     }
+  });
 </script>
 
 </body>
 </html>
+
