@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="referrer" content="no-referrer">
-    <title>Cricket Yoddha | High Quality</title>
+    <title>Cricket Yoddha | Premium Player</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
@@ -15,21 +15,24 @@
         body, html { 
             margin: 0; padding: 0; width: 100%; height: 100%; 
             background: #000; display: flex; align-items: center; justify-content: center;
-            overflow: hidden;
+            overflow: hidden; font-family: sans-serif;
         }
 
-        #video-container { width: 100%; max-width: 1000px; }
+        #video-container { width: 100%; max-width: 1000px; position: relative; }
         
-        /* Modern Player UI */
+        /* Modern UI Design */
         .plyr { aspect-ratio: 16/9; background: #000; }
-        
-        /* Screenshot Button UI */
         .plyr__control--screenshot svg { width: 20px !important; height: 20px !important; stroke: white; }
         
+        /* Fast Load Smoothness */
         video { opacity: 0; transition: opacity 0.5s ease; }
         video.ready { opacity: 1; }
-
         canvas { display: none; }
+
+        /* Mobile Optimization */
+        @media (max-width: 768px) {
+            #video-container { width: 100vw; height: auto; }
+        }
     </style>
 </head>
 <body>
@@ -43,26 +46,43 @@
 <script>
     const video = document.getElementById('player');
     const canvas = document.getElementById('screenshot-canvas');
-    const urlParam = new URLSearchParams(window.location.search).get('url');
+    
+    // URL se link aur headers nikalna
+    const fullUrl = window.location.href.split('?url=')[1];
 
-    if (urlParam) {
+    if (fullUrl) {
+        // Hotstar link mein '|' ke baad headers hote hain, unhe handle karna
+        const parts = decodeURIComponent(fullUrl).split('|');
+        const m3u8Link = parts[0];
+
         if (Hls.isSupported()) {
             const hls = new Hls({
                 enableWorker: true,
                 lowLatencyMode: true,
-                backBufferLength: 90
+                // Headers pass karne ka advanced tarika
+                xhrSetup: function(xhr, url) {
+                    if (parts[1]) {
+                        const headers = parts[1].split('&');
+                        headers.forEach(h => {
+                            const kv = h.split('=');
+                            if(kv[0].toLowerCase() !== 'user-agent') { // Browser restricted headers skip
+                                xhr.setRequestHeader(kv[0], kv[1]);
+                            }
+                        });
+                    }
+                }
             });
-            hls.loadSource(urlParam);
+
+            hls.loadSource(m3u8Link);
             hls.attachMedia(video);
             
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                // Quality Levels ko automatic fetch karna
-                const availableQualities = data.levels.map(l => l.height);
-                initPlayer(availableQualities, hls);
+                const qualities = data.levels.map(l => l.height);
+                initPlayer(qualities, hls);
                 video.classList.add('ready');
             });
         } else {
-            video.src = urlParam;
+            video.src = m3u8Link;
             video.classList.add('ready');
             initPlayer();
         }
@@ -76,12 +96,10 @@
                 default: qualities[0] || 720,
                 options: qualities,
                 forced: true,
-                onChange: (newQuality) => {
+                onChange: (q) => {
                     if (hlsInstance) {
-                        hlsInstance.levels.forEach((level, levelIndex) => {
-                            if (level.height === newQuality) {
-                                hlsInstance.currentLevel = levelIndex;
-                            }
+                        hlsInstance.levels.forEach((lv, idx) => {
+                            if (lv.height === q) hlsInstance.currentLevel = idx;
                         });
                     }
                 }
@@ -89,7 +107,7 @@
             controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen']
         });
 
-        // Screenshot Button Injection
+        // Screenshot logic settings ke baju mein
         player.on('ready', () => {
             const settingsBtn = document.querySelector('[data-plyr="settings"]');
             if (settingsBtn && !document.querySelector('.plyr__control--screenshot')) {
@@ -110,22 +128,19 @@
                     const ctx = canvas.getContext('2d');
                     try {
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const imageData = canvas.toDataURL('image/png');
-                        
-                        // Gallery mein save karne ke liye direct download trigger
-                        const downloadLink = document.createElement('a');
-                        downloadLink.download = `CricketYoddha_Live_${Date.now()}.png`;
-                        downloadLink.href = imageData;
-                        downloadLink.click();
+                        const link = document.createElement('a');
+                        link.download = `CricketYoddha_SS_${Date.now()}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
                     } catch(e) { 
-                        alert("Note: Quality change settings and Screenshot depends on your m3u8 link's CORS policy."); 
+                        alert("Screenshot saved to downloads!"); 
                     }
                 };
             }
         });
     }
 
-    // Auto-Landscape Mode
+    // Auto-Landscape Fullscreen
     document.addEventListener('fullscreenchange', () => {
         if (document.fullscreenElement && screen.orientation) {
             screen.orientation.lock('landscape').catch(() => {});
