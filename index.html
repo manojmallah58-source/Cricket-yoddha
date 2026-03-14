@@ -3,269 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shaka Player</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js"></script>
+    <title>Live Stream Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
     
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .shaka-video-container {
-            width: 100%;
-            height: 100%;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        .shaka-video-container { width: 100%; height: 100%; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        
         .manual-play-button {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px 30px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 18px;
-            z-index: 2000;
-            border: 2px solid #ff0000;
-            display: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.9); color: white; padding: 15px 25px;
+            border-radius: 50px; cursor: pointer; font-size: 18px; font-weight: bold;
+            z-index: 2000; border: none; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             transition: all 0.3s ease;
         }
 
-        .manual-play-button:hover {
-            background: rgba(255, 0, 0, 0.8);
-            transform: translate(-50%, -50%) scale(1.05);
-        }
-
-        #myLogo {
-            width: 60px;
-            height: 40px;
-            position: absolute;
-            right: 5px;
-            top: 10px;
-            z-index: 1500;
-        }
-
         #channelTitle {
-            position: absolute;
-            left: 10px;
-            top: 10px;
-            color: #fff;
-            font-size: 14px;
-            z-index: 1500;
-            background: rgba(0,0,0,0.6);
-            padding: 4px 8px;
-            border-radius: 4px;
+            position: absolute; left: 15px; top: 15px; color: #fff; font-size: 14px;
+            font-weight: bold; z-index: 1500; background: rgba(0,0,0,0.7);
+            padding: 6px 12px; border-radius: 4px; border-left: 3px solid #ff0000;
         }
     </style>
 </head>
 <body>
 
-<div class="shaka-video-container youtube-theme" data-shaka-player>
-    <video autoplay muted playsinline preload="auto" 
-           poster="https://blogger.googleusercontent.com/img/a/AVvXsEiGqaZeRBZ6Y7yV5ZYSRiNRhBa5q9_EMx7R5TJcHd3XJwwHh2YhNOGt76Y4vEcUIjvIaA7W-Tw1RyMLP-4WZwVHA4mk18zwXl7HdSL5WabprIasDOWJO7jpL0zTQB4p_y7X0Rv0xwe-cJ-GvxofAgeRp2FIiNgB90n_b8Cqw0sAaZqVhJg_fi9UyfSO8KY">
-    </video>
-
-    <div id="channelTitle"></div>
-    <div class="manual-play-button" id="manualPlayButton">
-        ▶ Click to Play
+    <div class="shaka-video-container youtube-theme" data-shaka-player>
+        <video autoplay muted playsinline id="video"></video>
+        <div id="channelTitle">Loading...</div>
+        <div class="manual-play-button" id="manualPlayButton">▶ Tap to Start Stream</div>
     </div>
-</div>
 
-<script>
-    const params = new URLSearchParams(window.location.search);
-    const streamUrl = params.get('url');
-    const keyId = params.get('keyId');
-    const key = params.get('key');
-    let cookieHeader = params.get('cookie') || '';
-    const channelName = params.get('name') || '';
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        
+        // 1. URL aur Cookie ko clean tarike se read karna
+        const streamUrl = decodeURIComponent(params.get('url') || '');
+        const keyId = params.get('keyId');
+        const key = params.get('key');
+        const channelName = params.get('name') || 'Live Stream';
+        let rawCookie = params.get('cookie') || '';
 
-    document.getElementById('channelTitle').textContent = channelName;
+        document.getElementById('channelTitle').textContent = channelName;
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        shaka.polyfill.installAll();
+        async function initPlayer() {
+            shaka.polyfill.installAll();
+            if (!shaka.Player.isBrowserSupported()) return;
 
-        if (!shaka.Player.isBrowserSupported()) {
-            console.error('Browser not supported');
-            return;
-        }
+            const video = document.getElementById('video');
+            const container = document.querySelector('.shaka-video-container');
+            const player = new shaka.Player(video);
+            const ui = new shaka.ui.Overlay(player, container, video);
 
-        if (!streamUrl) {
-            console.error('No stream URL provided');
-            alert('No stream URL found.');
-            return;
-        }
+            ui.configure({ 'controlPanelElements': ['play_pause', 'time_and_duration', 'spacer', 'mute', 'volume', 'quality', 'fullscreen'] });
 
-        const video = document.querySelector('video');
-        const player = new shaka.Player(video);
+            if (keyId && key) {
+                player.configure({ drm: { clearKeys: { [keyId]: key } } });
+            }
 
-        const container = document.querySelector('.shaka-video-container');
-        const ui = new shaka.ui.Overlay(player, container, video);
+            // 2. NETWORK FILTER: Yahan hum "Auto-Fix" kar rahe hain
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                request.headers['Referer'] = 'https://www.jiotv.com/';
+                request.headers['User-Agent'] = 'plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6';
 
-        const config = {
-            controlPanelElements: [
-                'play_pause',
-                'time_and_duration',
-                'mute',
-                'volume',
-                'spacer',
-                'captions',
-                'quality',
-                'language',
-                'picture_in_picture',
-                'fullscreen',
-                'overflow_menu'
-            ]
-        };
-        ui.configure(config);
-
-        // DRM clearkey
-        if (keyId && key) {
-            player.configure({
-                drm: {
-                    clearKeys: {
-                        [keyId]: key
+                if (rawCookie) {
+                    // FIX: Agar 'hdnea' ke aage underscores nahi hain, toh ye khud laga dega
+                    let cleanedCookie = rawCookie;
+                    if (cleanedCookie.includes('hdnea') && !cleanedCookie.includes('__hdnea__')) {
+                        cleanedCookie = cleanedCookie.replace('hdnea', '__hdnea__');
                     }
+
+                    request.headers['Cookie'] = cleanedCookie;
+
+                    // URL ke piche token lagana (Segments ke liye)
+                    request.uris.forEach((uri, index) => {
+                        if (!uri.includes('hdnea')) {
+                            const sep = uri.includes('?') ? '&' : '?';
+                            request.uris[index] = uri + sep + cleanedCookie;
+                        }
+                    });
                 }
+            });
+
+            player.configure({
+                streaming: { lowLatencyMode: true, bufferingGoal: 10, rebufferingGoal: 2 }
+            });
+
+            const manualBtn = document.getElementById('manualPlayButton');
+
+            try {
+                await player.load(streamUrl);
+                try {
+                    await video.play();
+                } catch (e) {
+                    manualBtn.style.display = 'block'; // Autoplay block hone par button dikhao
+                }
+            } catch (err) {
+                document.getElementById('channelTitle').textContent = "Stream Load Failed";
+            }
+
+            manualBtn.addEventListener('click', async () => {
+                manualBtn.style.display = 'none';
+                video.muted = false;
+                await video.play();
             });
         }
 
-        // Networking + headers + cookie token
-        player.getNetworkingEngine().registerRequestFilter((type, request) => {
-            request.headers['Referer'] = 'https://www.jiotv.com/';
-            request.headers['User-Agent'] = "plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6";
-
-            if (cookieHeader) {
-                request.headers['Cookie'] = cookieHeader;
-
-                if (
-                    (type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
-                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT) && 
-                    !request.uris[0].includes('__hdnea__=')
-                ) {
-                    const separator = request.uris[0].includes('?') ? '&' : '?';
-                    request.uris[0] += separator + cookieHeader;
-                }
-            }
-        });
-
-        player.configure({
-            streaming: {
-                lowLatencyMode: true,
-                bufferingGoal: 15,
-                rebufferingGoal: 2,
-                bufferBehind: 15,
-                retryParameters: {
-                    timeout: 10000,
-                    maxAttempts: 5,
-                    baseDelay: 300,
-                    backoffFactor: 1.2
-                },
-                segmentRequestTimeout: 8000,
-                segmentPrefetchLimit: 2,
-                useNativeHlsOnSafari: true
-            },
-            manifest: {
-                retryParameters: {
-                    timeout: 8000,
-                    maxAttempts: 3
-                }
-            }
-        });
-
-        const manualBtn = document.getElementById('manualPlayButton');
-
-        const attemptAutoplay = async () => {
-            try {
-                video.muted = false;
-                await video.play();
-                console.log('Unmuted autoplay success');
-                return true;
-            } catch (e1) {
-                console.log('Unmuted autoplay failed:', e1.message);
-                try {
-                    video.muted = true;
-                    await video.play();
-                    console.log('Muted autoplay success');
-                    return true;
-                } catch (e2) {
-                    console.log('Muted autoplay failed:', e2.message);
-                    return false;
-                }
-            }
-        };
-
-        player.addEventListener('error', (event) => {
-            console.error('Shaka Player Error:', event.detail);
-        });
-
-        video.addEventListener('play', () => {
-            if (window.self === window.top && !document.fullscreenElement && window.innerWidth <= 768) {
-                container.requestFullscreen().catch(() => {
-                    console.log('Fullscreen request failed');
-                });
-            }
-        }, { once: true });
-
-        video.addEventListener('loadedmetadata', () => {
-            video.volume = 0.8;
-        });
-
-        let hasUserInteracted = false;
-        const enableSoundOnInteraction = () => {
-            if (!hasUserInteracted && video.muted) {
-                video.muted = false;
-                hasUserInteracted = true;
-                console.log('Sound enabled after user interaction');
-            }
-        };
-        ['click', 'touchstart', 'keydown'].forEach(ev => {
-            document.addEventListener(ev, enableSoundOnInteraction, { once: true });
-        });
-
-        try {
-            await player.load(streamUrl);
-            const auto = await attemptAutoplay();
-            if (!auto) {
-                manualBtn.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Load error:', error);
-            alert('Failed to load stream.');
-        }
-
-        manualBtn.addEventListener('click', async () => {
-            manualBtn.style.display = 'none';
-            video.muted = false;
-            try {
-                await video.play();
-            } catch (e) {
-                console.error('Manual play error:', e);
-            }
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && video.paused) {
-                attemptAutoplay();
-            }
-        });
-    });
-</script>
-
+        document.addEventListener('shaka-ui-loaded', initPlayer);
+    </script>
 </body>
 </html>
