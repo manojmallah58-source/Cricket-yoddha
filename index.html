@@ -2,169 +2,268 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="referrer" content="no-referrer">
-    <title>Cricket Yoddha | Premium Player</title>
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shaka Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js"></script>
+    
     <style>
-        :root { --plyr-color-main: #ff0000; }
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background: #000; display: flex; align-items: center; justify-content: center;
-            overflow: hidden; font-family: sans-serif;
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        #video-container { width: 100%; max-width: 1000px; position: relative; overflow: hidden; }
-        
-        /* Modern UI Design */
-        .plyr { aspect-ratio: 16/9; background: #000; }
-        .plyr__control--screenshot svg { width: 20px !important; height: 20px !important; stroke: white; }
-        
-        /* Fast Load Smoothness */
-        video { opacity: 0; transition: opacity 0.5s ease; }
-        video.ready { opacity: 1; }
-        canvas { display: none; }
+        .shaka-video-container {
+            width: 100%;
+            height: 100%;
+        }
 
-        /* Animated Logo/Watermark Style */
-        .player-logo {
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .manual-play-button {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 10;
-            width: 50px; /* लोगो का छोटा साइज */
-            height: auto;
-            pointer-events: none; /* क्लिक वीडियो पर ही होगा */
-            opacity: 0.8;
-            filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
-            animation: pulse-glow 3s infinite ease-in-out;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            z-index: 2000;
+            border: 2px solid #ff0000;
+            display: none;
+            transition: all 0.3s ease;
         }
 
-        @keyframes pulse-glow {
-            0% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.08); opacity: 1; filter: drop-shadow(0 0 12px rgba(255,255,255,0.4)); }
-            100% { transform: scale(1); opacity: 0.7; }
+        .manual-play-button:hover {
+            background: rgba(255, 0, 0, 0.8);
+            transform: translate(-50%, -50%) scale(1.05);
         }
 
-        /* Mobile Optimization */
-        @media (max-width: 768px) {
-            #video-container { width: 100vw; height: auto; }
-            .player-logo { width: 40px; top: 10px; right: 10px; }
+        #myLogo {
+            width: 60px;
+            height: 40px;
+            position: absolute;
+            right: 5px;
+            top: 10px;
+            z-index: 1500;
+        }
+
+        #channelTitle {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            color: #fff;
+            font-size: 14px;
+            z-index: 1500;
+            background: rgba(0,0,0,0.6);
+            padding: 4px 8px;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
 
-<div id="video-container">
-    <img src="https://i.ibb.co/4RvCpCsM/Qdqj-WDqj-QOOb5vb-K8f4wf-Q.png" alt="Logo" class="player-logo">
-    
-    <video id="player" playsinline controls crossorigin="anonymous"></video>
+<div class="shaka-video-container youtube-theme" data-shaka-player>
+    <video autoplay muted playsinline preload="auto" 
+           poster="https://blogger.googleusercontent.com/img/a/AVvXsEiGqaZeRBZ6Y7yV5ZYSRiNRhBa5q9_EMx7R5TJcHd3XJwwHh2YhNOGt76Y4vEcUIjvIaA7W-Tw1RyMLP-4WZwVHA4mk18zwXl7HdSL5WabprIasDOWJO7jpL0zTQB4p_y7X0Rv0xwe-cJ-GvxofAgeRp2FIiNgB90n_b8Cqw0sAaZqVhJg_fi9UyfSO8KY">
+    </video>
+
+    <div id="channelTitle"></div>
+    <div class="manual-play-button" id="manualPlayButton">
+        ▶ Click to Play
+    </div>
 </div>
 
-<canvas id="screenshot-canvas"></canvas>
-
 <script>
-    const video = document.getElementById('player');
-    const canvas = document.getElementById('screenshot-canvas');
-    
-    const fullUrl = window.location.href.split('?url=')[1];
+    const params = new URLSearchParams(window.location.search);
+    const streamUrl = params.get('url');
+    const keyId = params.get('keyId');
+    const key = params.get('key');
+    let cookieHeader = params.get('cookie') || '';
+    const channelName = params.get('name') || '';
 
-    if (fullUrl) {
-        const parts = decodeURIComponent(fullUrl).split('|');
-        const m3u8Link = parts[0];
+    document.getElementById('channelTitle').textContent = channelName;
 
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: true,
-                xhrSetup: function(xhr, url) {
-                    if (parts[1]) {
-                        const headers = parts[1].split('&');
-                        headers.forEach(h => {
-                            const kv = h.split('=');
-                            if(kv[0].toLowerCase() !== 'user-agent') {
-                                xhr.setRequestHeader(kv[0], kv[1]);
-                            }
-                        });
-                    }
-                }
-            });
+    document.addEventListener('DOMContentLoaded', async () => {
+        shaka.polyfill.installAll();
 
-            hls.loadSource(m3u8Link);
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                const qualities = data.levels.map(l => l.height);
-                initPlayer(qualities, hls);
-                video.classList.add('ready');
-            });
-        } else {
-            video.src = m3u8Link;
-            video.classList.add('ready');
-            initPlayer();
+        if (!shaka.Player.isBrowserSupported()) {
+            console.error('Browser not supported');
+            return;
         }
-    }
 
-    function initPlayer(qualities = [], hlsInstance = null) {
-        const player = new Plyr(video, {
-            autoplay: true,
-            settings: ['quality', 'speed'],
-            quality: {
-                default: qualities[0] || 720,
-                options: qualities,
-                forced: true,
-                onChange: (q) => {
-                    if (hlsInstance) {
-                        hlsInstance.levels.forEach((lv, idx) => {
-                            if (lv.height === q) hlsInstance.currentLevel = idx;
-                        });
+        if (!streamUrl) {
+            console.error('No stream URL provided');
+            alert('No stream URL found.');
+            return;
+        }
+
+        const video = document.querySelector('video');
+        const player = new shaka.Player(video);
+
+        const container = document.querySelector('.shaka-video-container');
+        const ui = new shaka.ui.Overlay(player, container, video);
+
+        const config = {
+            controlPanelElements: [
+                'play_pause',
+                'time_and_duration',
+                'mute',
+                'volume',
+                'spacer',
+                'captions',
+                'quality',
+                'language',
+                'picture_in_picture',
+                'fullscreen',
+                'overflow_menu'
+            ]
+        };
+        ui.configure(config);
+
+        // DRM clearkey
+        if (keyId && key) {
+            player.configure({
+                drm: {
+                    clearKeys: {
+                        [keyId]: key
                     }
                 }
-            },
-            controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen']
-        });
+            });
+        }
 
-        player.on('ready', () => {
-            const settingsBtn = document.querySelector('[data-plyr="settings"]');
-            if (settingsBtn && !document.querySelector('.plyr__control--screenshot')) {
-                const ssBtn = document.createElement('button');
-                ssBtn.type = 'button';
-                ssBtn.className = 'plyr__control plyr__control--screenshot';
-                ssBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                        <circle cx="12" cy="13" r="4"></circle>
-                    </svg>`;
-                
-                settingsBtn.before(ssBtn);
+        // Networking + headers + cookie token
+        player.getNetworkingEngine().registerRequestFilter((type, request) => {
+            request.headers['Referer'] = 'https://www.jiotv.com/';
+            request.headers['User-Agent'] = "plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6";
 
-                ssBtn.onclick = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    try {
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const link = document.createElement('a');
-                        link.download = `CricketYoddha_SS_${Date.now()}.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                    } catch(e) { 
-                        alert("Screenshot saved!"); 
-                    }
-                };
+            if (cookieHeader) {
+                request.headers['Cookie'] = cookieHeader;
+
+                if (
+                    (type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
+                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT) && 
+                    !request.uris[0].includes('__hdnea__=')
+                ) {
+                    const separator = request.uris[0].includes('?') ? '&' : '?';
+                    request.uris[0] += separator + cookieHeader;
+                }
             }
         });
-    }
 
-    document.addEventListener('fullscreenchange', () => {
-        if (document.fullscreenElement && screen.orientation) {
-            screen.orientation.lock('landscape').catch(() => {});
-        } else {
-            if (screen.orientation.unlock) screen.orientation.unlock();
+        player.configure({
+            streaming: {
+                lowLatencyMode: true,
+                bufferingGoal: 15,
+                rebufferingGoal: 2,
+                bufferBehind: 15,
+                retryParameters: {
+                    timeout: 10000,
+                    maxAttempts: 5,
+                    baseDelay: 300,
+                    backoffFactor: 1.2
+                },
+                segmentRequestTimeout: 8000,
+                segmentPrefetchLimit: 2,
+                useNativeHlsOnSafari: true
+            },
+            manifest: {
+                retryParameters: {
+                    timeout: 8000,
+                    maxAttempts: 3
+                }
+            }
+        });
+
+        const manualBtn = document.getElementById('manualPlayButton');
+
+        const attemptAutoplay = async () => {
+            try {
+                video.muted = false;
+                await video.play();
+                console.log('Unmuted autoplay success');
+                return true;
+            } catch (e1) {
+                console.log('Unmuted autoplay failed:', e1.message);
+                try {
+                    video.muted = true;
+                    await video.play();
+                    console.log('Muted autoplay success');
+                    return true;
+                } catch (e2) {
+                    console.log('Muted autoplay failed:', e2.message);
+                    return false;
+                }
+            }
+        };
+
+        player.addEventListener('error', (event) => {
+            console.error('Shaka Player Error:', event.detail);
+        });
+
+        video.addEventListener('play', () => {
+            if (window.self === window.top && !document.fullscreenElement && window.innerWidth <= 768) {
+                container.requestFullscreen().catch(() => {
+                    console.log('Fullscreen request failed');
+                });
+            }
+        }, { once: true });
+
+        video.addEventListener('loadedmetadata', () => {
+            video.volume = 0.8;
+        });
+
+        let hasUserInteracted = false;
+        const enableSoundOnInteraction = () => {
+            if (!hasUserInteracted && video.muted) {
+                video.muted = false;
+                hasUserInteracted = true;
+                console.log('Sound enabled after user interaction');
+            }
+        };
+        ['click', 'touchstart', 'keydown'].forEach(ev => {
+            document.addEventListener(ev, enableSoundOnInteraction, { once: true });
+        });
+
+        try {
+            await player.load(streamUrl);
+            const auto = await attemptAutoplay();
+            if (!auto) {
+                manualBtn.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Load error:', error);
+            alert('Failed to load stream.');
         }
+
+        manualBtn.addEventListener('click', async () => {
+            manualBtn.style.display = 'none';
+            video.muted = false;
+            try {
+                await video.play();
+            } catch (e) {
+                console.error('Manual play error:', e);
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && video.paused) {
+                attemptAutoplay();
+            }
+        });
     });
 </script>
 
