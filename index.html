@@ -3,114 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Stream Player</title>
+    <title>Cricket Yoddha Player</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
-    
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         .shaka-video-container { width: 100%; height: 100%; }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        
-        .manual-play-button {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.9); color: white; padding: 15px 25px;
-            border-radius: 50px; cursor: pointer; font-size: 18px; font-weight: bold;
-            z-index: 2000; border: none; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
-        }
-
-        #channelTitle {
-            position: absolute; left: 15px; top: 15px; color: #fff; font-size: 14px;
-            font-weight: bold; z-index: 1500; background: rgba(0,0,0,0.7);
-            padding: 6px 12px; border-radius: 4px; border-left: 3px solid #ff0000;
-        }
+        video { width: 100%; height: 100%; }
+        #channelTitle { position: absolute; left: 10px; top: 10px; color: white; z-index: 10; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; font-size: 14px; border-left: 3px solid red; }
+        .manual-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: red; color: white; padding: 15px 25px; border-radius: 50px; cursor: pointer; z-index: 20; display: none; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="shaka-video-container youtube-theme" data-shaka-player>
+    <div id="channelTitle">Loading Stream...</div>
+    <div class="shaka-video-container" data-shaka-player>
         <video autoplay muted playsinline id="video"></video>
-        <div id="channelTitle">Loading...</div>
-        <div class="manual-play-button" id="manualPlayButton">▶ Tap to Start Stream</div>
+        <div class="manual-play" id="playBtn">▶ CLICK TO PLAY</div>
     </div>
 
     <script>
-        const params = new URLSearchParams(window.location.search);
-        
-        // 1. URL aur Cookie ko clean tarike se read karna
-        const streamUrl = decodeURIComponent(params.get('url') || '');
-        const keyId = params.get('keyId');
-        const key = params.get('key');
-        const channelName = params.get('name') || 'Live Stream';
-        let rawCookie = params.get('cookie') || '';
+        // SMART PARSER: Ye pure URL se data nikalega chahe nested ho
+        function getParam(name) {
+            const url = window.location.href;
+            const regex = new RegExp("[?&]" + name + "=(^&#]*)");
+            const results = regex.exec(url);
+            return results ? decodeURIComponent(results[1].replace(/\+/g, " ")) : null;
+        }
 
-        document.getElementById('channelTitle').textContent = channelName;
+        const streamUrl = getParam('url');
+        const keyId = getParam('keyId');
+        const key = getParam('key');
+        const cookie = getParam('cookie');
+        const name = getParam('name') || "Live Sports";
 
-        async function initPlayer() {
+        document.getElementById('channelTitle').textContent = name;
+
+        async function init() {
             shaka.polyfill.installAll();
-            if (!shaka.Player.isBrowserSupported()) return;
-
             const video = document.getElementById('video');
-            const container = document.querySelector('.shaka-video-container');
             const player = new shaka.Player(video);
-            const ui = new shaka.ui.Overlay(player, container, video);
+            const ui = new shaka.ui.Overlay(player, document.querySelector('.shaka-video-container'), video);
 
-            ui.configure({ 'controlPanelElements': ['play_pause', 'time_and_duration', 'spacer', 'mute', 'volume', 'quality', 'fullscreen'] });
-
+            // DRM Setup
             if (keyId && key) {
-                player.configure({ drm: { clearKeys: { [keyId]: key } } });
+                player.configure({
+                    drm: { clearKeys: { [keyId.trim()]: key.trim() } }
+                });
             }
 
-            // 2. NETWORK FILTER: Yahan hum "Auto-Fix" kar rahe hain
+            // Headers & Cookie Fix
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
                 request.headers['Referer'] = 'https://www.jiotv.com/';
                 request.headers['User-Agent'] = 'plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6';
+                
+                if (cookie) {
+                    let fullCookie = cookie.includes('hdnea') && !cookie.includes('__hdnea__') 
+                                     ? cookie.replace('hdnea', '__hdnea__') 
+                                     : cookie;
+                    
+                    request.headers['Cookie'] = fullCookie;
 
-                if (rawCookie) {
-                    // FIX: Agar 'hdnea' ke aage underscores nahi hain, toh ye khud laga dega
-                    let cleanedCookie = rawCookie;
-                    if (cleanedCookie.includes('hdnea') && !cleanedCookie.includes('__hdnea__')) {
-                        cleanedCookie = cleanedCookie.replace('hdnea', '__hdnea__');
-                    }
-
-                    request.headers['Cookie'] = cleanedCookie;
-
-                    // URL ke piche token lagana (Segments ke liye)
-                    request.uris.forEach((uri, index) => {
+                    request.uris.forEach((uri, i) => {
                         if (!uri.includes('hdnea')) {
                             const sep = uri.includes('?') ? '&' : '?';
-                            request.uris[index] = uri + sep + cleanedCookie;
+                            request.uris[i] = uri + sep + fullCookie;
                         }
                     });
                 }
             });
 
-            player.configure({
-                streaming: { lowLatencyMode: true, bufferingGoal: 10, rebufferingGoal: 2 }
-            });
-
-            const manualBtn = document.getElementById('manualPlayButton');
+            player.configure({ streaming: { lowLatencyMode: true } });
 
             try {
                 await player.load(streamUrl);
-                try {
-                    await video.play();
-                } catch (e) {
-                    manualBtn.style.display = 'block'; // Autoplay block hone par button dikhao
+                await video.play();
+            } catch (e) {
+                console.error("Load Error", e);
+                if (e.code !== 7000) { // 7000 is load interrupted
+                    document.getElementById('playBtn').style.display = 'block';
                 }
-            } catch (err) {
-                document.getElementById('channelTitle').textContent = "Stream Load Failed";
             }
 
-            manualBtn.addEventListener('click', async () => {
-                manualBtn.style.display = 'none';
+            document.getElementById('playBtn').addEventListener('click', () => {
                 video.muted = false;
-                await video.play();
+                video.play();
+                document.getElementById('playBtn').style.display = 'none';
             });
         }
 
-        document.addEventListener('shaka-ui-loaded', initPlayer);
+        document.addEventListener('shaka-ui-loaded', init);
     </script>
 </body>
 </html>
