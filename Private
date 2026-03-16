@@ -1,0 +1,188 @@
+Q1. Import a CSV dataset into R. Display the structure, first 10 rows, and summary of the dataset. Handle missing values.
+# Import CSV file
+data <- read.csv("data.csv")
+
+# Display structure of dataset
+str(data)
+
+# Display first 10 rows
+head(data, 10)
+
+# Summary of dataset
+summary(data)
+
+# Replace missing values with mean (for numeric columns)
+data$Age[is.na(data$Age)] <- mean(data$Age, na.rm = TRUE)
+data$Salary[is.na(data$Salary)] <- mean(data$Salary, na.rm = TRUE)
+
+
+Q2. Create a dataset from an Excel file. Apply conditional filtering and sort data.
+
+
+# Install package
+install.packages("readxl")
+
+# Load library
+library(readxl)
+
+# Import Excel file
+data <- read_excel("data.xlsx")
+
+# Filter records where Salary > 50000
+filtered_data <- data[data$Salary > 50000, ]
+
+# Sort data in descending order
+sorted_data <- filtered_data[order(-filtered_data$Salary), ]
+
+# Display result
+sorted_data
+
+
+
+
+
+
+
+
+Q3. Select specific variables and create new calculated variable.
+
+# Select specific columns
+new_data <- data[, c("Name", "Age", "Salary")]
+
+# Create new variable
+new_data$Annual_Salary <- new_data$Salary * 12
+
+# Display dataset
+head(new_data)
+
+
+Q4. Identify and remove duplicate observations.
+
+
+# Number of records before removing duplicates
+nrow(data)
+
+# Remove duplicates
+data_unique <- data[!duplicated(data), ]
+
+# Number of records after removing duplicates
+nrow(data_unique)
+
+
+Q5. Reshape wide dataset into long format and back to wide format.
+
+install.packages("tidyr")
+library(tidyr)
+
+# Convert wide to long
+long_data <- pivot_longer(data,
+                          cols = c(Math, Science, English),
+                          names_to = "Subject",
+                          values_to = "Marks")
+
+# Convert long to wide
+wide_data <- pivot_wider(long_data,
+                         names_from = Subject,
+                         values_from = Marks)
+
+wide_data
+
+Q6. Generate descriptive statistics and frequency tables.
+
+# Descriptive statistics
+summary(data)
+
+# Frequency table for categorical variable
+table(data$Gender)
+
+# Frequency table with percentage
+prop.table(table(data$Gender))*100
+
+
+
+# Dataset ka summary mean, median aur range show karta hai
+# Frequency table categorical variable ka distribution batata hai
+
+Q7. Perform one-sample t-test and two-sample t-test.
+
+
+R
+Copy code
+# One-sample t-test
+t.test(data$Salary, mu = 50000)
+
+# Two-sample t-test
+t.test(Salary ~ Gender, data = data)
+Hypothesis
+One Sample
+H0: Mean salary = 50000
+H1: Mean salary ≠ 50000
+Two Sample
+H0: Male aur Female salary ka mean same hai
+H1: Dono ka mean different hai
+Interpretation:
+p-value < 0.05 ho to null hypothesis reject ho jata hai.
+
+
+Q8. Chi-square test of independence.
+Answer
+R
+Copy code
+# Create contingency table
+table_data <- table(data$Gender, data$Department)
+
+# Chi-square test
+chisq.test(table_data)
+
+# Expected frequencies
+chisq.test(table_data)$expected
+
+Q9. Create visualizations using ggplot2.
+Answer
+R
+Copy code
+install.packages("ggplot2")
+library(ggplot2)
+
+# Histogram
+ggplot(data, aes(x = Salary)) +
+  geom_histogram(fill = "blue") +
+  labs(title="Salary Distribution", x="Salary", y="Frequency")
+
+# Box plot
+ggplot(data, aes(x = Gender, y = Salary)) +
+  geom_boxplot() +
+  labs(title="Salary by Gender")
+
+# Scatter plot
+ggplot(data, aes(x = Age, y = Salary)) +
+  geom_point() +
+  labs(title="Age vs Salary")
+Explanation:
+Histogram distribution show karta hai, boxplot variation aur scatter plot relationship show karta hai.
+
+Q10. Perform linear regression and logistic regression.
+Answer
+R
+Copy code
+# Linear regression
+model1 <- lm(Salary ~ Age + Experience, data = data)
+
+summary(model1)
+
+# Logistic regression
+model2 <- glm(Purchased ~ Age + Salary,
+              data = data,
+              family = binomial)
+
+summary(model2)
+
+# Export results to CSV
+write.csv(summary(model1)$coefficients, "linear_results.csv")
+Interpretation:
+Regression coefficients batate hain ki independent variables dependent variable ko kitna affect karte hain.
+
+
+
+
+
