@@ -35,4 +35,19 @@ public class LoopExample {
 
 
 
-3.
+3.Write a program in Java to evaluate a+b*c%d.
+
+public class OperatorDemo {
+    public static void main(String[] args) {
+        int a = 10, b = 5, c = 4, d = 3;
+
+        // Expression: a + b * c % d
+        int result = a + b * c % d;
+
+        System.out.println("Result: " + result);
+    }
+}
+
+
+
+4.
