@@ -50,4 +50,19 @@ public class OperatorDemo {
 
 
 
-4.
+4.Write a program in java to find the biggest element among three numbers using it else
+
+public class FindBiggest {
+    public static void main(String[] args) {
+        int a = 15, b = 25, c = 10;
+
+        if (a >= b && a >= c) {
+            System.out.println("Biggest: " + a);
+        } else if (b >= a && b >= c) {
+            System.out.println("Biggest: " + b);
+        } else {
+            System.out.println("Biggest: " + c);
+        }
+    }
+}
+
