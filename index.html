@@ -3,104 +3,267 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shaka Player - Fixed</title>
+    <title>JioTV Stream Player - Final Fix</title>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/controls.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.js"></script>
+    
     <style>
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .shaka-video-container { width: 100%; height: 100%; }
-        video { width: 100%; height: 100%; }
-        .manual-play-button {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.8); color: white; padding: 15px 25px;
-            border-radius: 5px; cursor: pointer; z-index: 2000; display: none;
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
         }
+
+        /* Essential Shaka Player Container Styling */
+        .shaka-video-container {
+            width: 100%;
+            height: 100%;
+            background-color: black;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Maintain aspect ratio */
+        }
+
+        /* Overlay with a custom play button if autoplay fails */
+        .manual-play-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000; /* Must be above Shaka UI */
+            cursor: pointer;
+            display: none; /* Hidden by default */
+        }
+
+        .play-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            color: #ff0000;
+        }
+
+        .play-text {
+            font-size: 20px;
+            font-weight: bold;
+            border: 2px solid #ff0000;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+
+        /* Error message overlay */
+        #errorOverlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); color: white;
+            display: none; justify-content: center; align-items: center;
+            z-index: 2500; text-align: center; padding: 20px; flex-direction: column;
+        }
+        #errorOverlay p { font-size: 18px; margin-bottom: 10px; }
+        #errorOverlay button { background: #ff0000; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+
     </style>
 </head>
 <body>
 
-<div class="shaka-video-container" data-shaka-player>
-    <video autoplay playsinline id="video"></video>
-    <div class="manual-play-button" id="manualPlayButton">▶ Click to Play</div>
+<div class="shaka-video-container youtube-theme" data-shaka-player-container>
+    <video autoplay playsinline id="video" preload="auto" poster="https://blogger.googleusercontent.com/img/a/AVvXsEiGqaZeRBZ6Y7yV5ZYSRiNRhBa5q9_EMx7R5TJcHd3XJwwHh2YhNOGt76Y4vEcUIjvIaA7W-Tw1RyMLP-4WZwVHA4mk18zwXl7HdSL5WabprIasDOWJO7jpL0zTQB4p_y7X0Rv0xwe-cJ-GvxofAgeRp2FIiNgB90n_b8Cqw0sAaZqVhJg_fi9UyfSO8KY"></video>
+    
+    <div class="manual-play-overlay" id="manualPlayOverlay">
+        <div class="play-icon">▶</div>
+        <div class="play-text">Click to Play Stream</div>
+    </div>
+
+    <div id="errorOverlay">
+        <p>⚠️ Error: Stream could not be loaded.</p>
+        <p id="errorDetails" style="font-size: 14px; color: #aaa;"></p>
+        <button onclick="location.reload()">Retry</button>
+    </div>
 </div>
 
 <script>
-    async function initPlayer() {
-        const params = new URLSearchParams(window.location.search);
-        
-        // URL se data nikalna (Aapke naye format ke hisaab se)
-        const streamUrl = params.get('url');
-        const drmLicense = params.get('drmLicense'); // Format: "keyId:key"
-        const cookieVal = params.get('Cookie') || '';
+    const manualOverlay = document.getElementById('manualPlayOverlay');
+    const errorOverlay = document.getElementById('errorOverlay');
+    const errorDetails = document.getElementById('errorDetails');
+    const video = document.getElementById('video');
 
-        if (!streamUrl) {
-            alert("No Stream URL found!");
+    async function initPlayer() {
+        // Install polyfills to patch browser incompatibilities
+        shaka.polyfill.installAll();
+
+        // Check to see if the browser supports the basic APIs Shaka needs
+        if (!shaka.Player.isBrowserSupported()) {
+            console.error('Browser not supported!');
+            errorDetails.textContent = "Your browser is not supported.";
+            errorOverlay.style.display = 'flex';
             return;
         }
 
-        const video = document.getElementById('video');
-        const player = new shaka.Player(video);
-        const ui = new shaka.ui.Overlay(player, document.querySelector('.shaka-video-container'), video);
+        // 1. Parsing and Robust Parameter Extraction
+        const params = new URLSearchParams(window.location.search);
+        
+        // This handles cases where the URL itself contains special characters
+        let streamUrl = params.get('url');
+        const drmLicenseRaw = params.get('drmLicense'); // Expecting "keyId:key"
+        
+        // Handle case-sensitivity issues for Cookie param
+        let cookieVal = params.get('Cookie') || params.get('cookie') || '';
 
-        // DRM Setup
-        if (drmLicense && drmLicense.includes(':')) {
-            const [keyId, key] = drmLicense.split(':');
-            player.configure({
-                drm: {
-                    clearKeys: { [keyId]: key }
-                }
-            });
+        // If the stream URL itself was encoded, clean it up
+        if (streamUrl && streamUrl.includes('|')) {
+            const parts = streamUrl.split('|');
+            streamUrl = parts[0];
+            // In some cases, the Cookie part is separated by a '|'
+            if (!cookieVal && parts[1] && parts[1].toLowerCase().startsWith('cookie=')) {
+                cookieVal = parts[1].split('=')[1];
+            }
         }
 
-        // Headers aur Cookies fixing
+        if (!streamUrl) {
+            errorDetails.textContent = "No stream URL found in the link.";
+            errorOverlay.style.display = 'flex';
+            return;
+        }
+
+        // 2. Setup the Player and UI
+        const player = new shaka.Player(video);
+        const container = document.querySelector('.shaka-video-container');
+        
+        // We initialize UI manually for better control over configuration
+        const ui = new shaka.ui.Overlay(player, container, video);
+        
+        // UI Configuration (using standard YouTube-like elements)
+        ui.configure({
+            controlPanelElements: [
+                'play_pause', 'time_and_duration', 'mute', 'volume', 'spacer',
+                'captions', 'quality', 'language', 'picture_in_picture', 'fullscreen', 'overflow_menu'
+            ],
+            // Ensure UI handles mobile devices correctly
+            addFastForwardBitrate: true,
+            addRewindBitrate: true,
+        });
+
+        // 3. DRM Configuration for ClearKey
+        if (drmLicenseRaw && drmLicenseRaw.includes(':')) {
+            const [keyId, key] = drmLicenseRaw.split(':');
+            if (keyId.length > 0 && key.length > 0) {
+                console.log('DRM ClearKey setup:', keyId);
+                player.configure({
+                    drm: {
+                        clearKeys: {
+                            [keyId]: key
+                        }
+                    }
+                });
+            }
+        }
+
+        // 4. Critical JioTV Networking Filter
         player.getNetworkingEngine().registerRequestFilter((type, request) => {
+            // These headers are mandatory for JioTV streams
             request.headers['User-Agent'] = "plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6";
             request.headers['Referer'] = 'https://www.jiotv.com/';
 
+            // 5. Robust Cookie/Token Token Handling
             if (cookieVal) {
-                // Cookie ko header mein set karna
+                // Set as HTTP Header (most standard approach)
                 request.headers['Cookie'] = cookieVal;
                 
-                // Agar URL mein token nahi hai toh append karna
-                if (!request.uris[0].includes('__hdnea__')) {
-                    const sep = request.uris[0].includes('?') ? '&' : '?';
+                // Some Jio CDNs expect the token in the URL query parameters
+                // especially for segments (.ts files). We append it if missing.
+                const uri = request.uris[0];
+                if (!uri.includes('__hdnea__') && !uri.includes(cookieVal.split('=')[0])) {
+                    const sep = uri.includes('?') ? '&' : '?';
                     request.uris[0] += sep + cookieVal;
+                    // console.log("Appending token to segment:", type, request.uris[0]);
                 }
             }
         });
 
+        // 6. Advanced Streaming Configuration
         player.configure({
             streaming: {
                 lowLatencyMode: true,
-                rebufferingGoal: 2,
-                bufferingGoal: 10
+                // Increase values slightly for better stability on unstable connections
+                bufferingGoal: 15,
+                rebufferingGoal: 5,
+                bufferBehind: 20,
+                // Make manifest fetching more resilient
+                manifest: {
+                    retryParameters: { maxAttempts: 5, baseDelay: 500, backoffFactor: 1.5 }
+                }
             }
         });
 
-        try {
-            await player.load(streamUrl);
-            console.log('Stream loaded!');
+        // 7. Error Handling for Stream Load Failures (e.g., expired token)
+        player.addEventListener('error', (event) => {
+            const error = event.detail;
+            console.error('Shaka Player Error:', error);
             
-            // Autoplay check
+            // Handle HTTP 403 (Forbidden) - Usually indicates expired token
+            if (error.code === shaka.util.Error.Code.BAD_HTTP_STATUS && error.data[1] === 403) {
+                errorDetails.textContent = "Error 403: The stream URL or token has likely expired. A new link is required.";
+                errorOverlay.style.display = 'flex';
+            } else if (error.code === shaka.util.Error.Code.DRM_FAILED_TO_CREATE_SESSION) {
+                errorDetails.textContent = "DRM Error: Failed to create key session. Key might be invalid.";
+                errorOverlay.style.display = 'flex';
+            }
+        });
+
+        // 8. Attempt to load and handle autoplay blockers
+        try {
+            console.log("Loading stream:", streamUrl);
+            await player.load(streamUrl);
+            console.log('Stream loaded successfully.');
+            
+            // Check for autoplay success
+            const attemptAutoplay = async () => {
+                try {
+                    await video.play();
+                    console.log('Autoplay success.');
+                } catch (e) {
+                    console.log('Autoplay blocked. Showing manual play overlay.');
+                    manualOverlay.style.display = 'flex';
+                }
+            };
+            
+            // Small delay for browser compatibility
+            setTimeout(attemptAutoplay, 100);
+
+        } catch (error) {
+            console.error('Initial load error:', error);
+            errorDetails.textContent = `Could not load stream: ${error.message}`;
+            errorOverlay.style.display = 'flex';
+        }
+
+        // Handle the manual play click
+        manualOverlay.addEventListener('click', async () => {
+            manualOverlay.style.display = 'none';
             try {
                 await video.play();
             } catch (e) {
-                document.getElementById('manualPlayButton').style.display = 'block';
+                console.error('Manual play failed:', e);
             }
-        } catch (error) {
-            console.error('Error loading stream:', error);
-        }
-
-        document.getElementById('manualPlayButton').addEventListener('click', () => {
-            video.play();
-            document.getElementById('manualPlayButton').style.display = 'none';
         });
     }
 
+    // Initialize after Shaka UI is ready
     document.addEventListener('shaka-ui-loaded', initPlayer);
-    document.addEventListener('DOMContentLoaded', () => {
-        shaka.polyfill.installAll();
-    });
 </script>
 </body>
 </html>
