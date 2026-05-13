@@ -3,93 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crickly – Stream Player</title>
+    <title>Crickly – Live Player</title>
 
-    <!-- Shaka Player Styles (Zaroori hai controls ke liye) -->
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Shaka Player (JS + CSS) - Video chalane ke liye zaroori -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/controls.min.css" crossorigin="anonymous">
-    
+
     <style>
-        /* Image 1000072103.jpg jaisa look dene ke liye CSS */
+        /* Image 1000072103.jpg jaisa dark theme */
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #000; /* Poora background black */
+            background-color: #000;
+            color: #fff;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Video Container - Screen ke beech mein */
+        .main-content {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            font-family: 'Poppins', sans-serif;
+            width: 100%;
         }
 
-        .video-wrapper {
+        .player-container {
             width: 100%;
             max-width: 100%;
-            position: relative;
-        }
-
-        /* Shaka player container ko handle karne ke liye */
-        .shaka-video-container {
-            width: 100% !important;
-            height: auto !important;
-            aspect-ratio: 16 / 9;
+            background: #000;
         }
 
         video {
             width: 100%;
-            height: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
         }
 
-        /* Loader ko center mein rakhne ke liye */
-        .page-loader {
+        /* Title aur Live Count (Feature preserved) */
+        .player-info {
+            padding: 15px;
+            background: rgba(20, 20, 20, 0.8);
+            position: absolute;
+            top: 0;
+            width: 100%;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .match-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .live-badge {
+            background: #ff0000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dot {
+            height: 8px;
+            width: 8px;
+            background-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* Loader */
+        .loader {
             position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: #000;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 999;
-            color: white;
+            z-index: 100;
         }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
 
 <body>
 
-    <!-- Loading screen -->
-    <div id="pageLoader" class="page-loader">
-        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite;"></div>
-        <p>Loading Stream...</p>
-    </div>
-
-    <div class="video-wrapper">
-        <div class="shaka-video-container" data-shaka-player-container>
-            <video id="video" data-shaka-player playsinline autoplay></video>
+    <!-- Features: Title aur Live Badge (Aapke pehle code se) -->
+    <div class="player-info">
+        <h2 id="matchTitle" class="match-title">Loading Stream...</h2>
+        <div class="live-badge">
+            <span class="dot"></span>
+            <span id="liveUserCount">0</span> LIVE
         </div>
     </div>
 
-    <!-- Shaka Player Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js" crossorigin="anonymous"></script>
-    
-    <!-- Aapki purani logic file jo video load karti hai -->
+    <!-- Main Video Player Section -->
+    <div class="main-content">
+        <div class="player-container shaka-video-container" data-shaka-player>
+            <video id="video" playsinline autoplay muted></video>
+        </div>
+    </div>
+
+    <!-- Page Loader -->
+    <div id="pageLoader" class="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px;">CRICKLY</p>
+    </div>
+
+    <!-- Aapka main logic script (Wahi rakha hai jo video chalata hai) -->
     <script type="module" src="player2.js"></script>
 
     <script>
-        // Loader hatane ki script
+        // Loader hatane ki logic
         window.addEventListener('load', () => {
             setTimeout(() => {
                 const loader = document.getElementById('pageLoader');
                 if (loader) loader.style.display = 'none';
-            }, 1000);
+            }, 1500);
         });
 
-        // CSS Animation for loader
-        const style = document.createElement('style');
-        style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
-        document.head.appendChild(style);
+        // Ads ya popups ko block karne ke liye safeguard
+        setInterval(() => {
+            const unwanted = document.querySelectorAll('.tg-overlay, .tg-popup, iframe[src*="ads"]');
+            unwanted.forEach(el => el.remove());
+        }, 1000);
     </script>
 
 </body>
