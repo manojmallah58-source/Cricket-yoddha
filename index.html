@@ -60,12 +60,14 @@
 </head>
 <body>
 
+  <!-- Popup Modal -->
   <div class="overlay" id="forcePop">
     <div class="modal">
       <div class="icon-wrapper"><i class="material-icons modal-icon">gpp_maybe</i></div>
       <h2>AUTHORIZATION REQUIRED</h2>
-      <p>Join our official Telegram channel to unlock HD match links. Valid for 24 hours.</p>
+      <p>To access this live stream, you must join our official Telegram channel. <br><br>Joining is Compulsory to unlock and watch the live match.</p>
       <a href="https://t.me/+rwZKMV0-L8wyOTll" target="_blank" onclick="verifyAccess()" class="btn-join">JOIN TELEGRAM & UNLOCK</a>
+      <div style="color: #444; font-size: 10px; margin-top: 20px; letter-spacing: 2px;">SECURE VIP GATEWAY v12.0</div>
     </div>
   </div>
 
@@ -76,6 +78,7 @@
 
   <div id="main-stage">
     <div class="video-box">
+      <!-- Player -->
       <iframe id="main-player" src="" allowfullscreen="true" scrolling="no" allow="autoplay; encrypted-media"></iframe>
     </div>
     <div class="ticker">
@@ -99,57 +102,45 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    const JSON_URL = "https://raw.githubusercontent.com/manojmallah58-source/Cricket-yoddha-json/main/links.json";
-    const CURRENT_CHANNEL_ID = "yoddha_hindi";
-    const DB_NAME = "cricket_yoddha_hindi";
+    // Logic: URL Parameter se video link lena
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get('url'); // ?url=VEXts3jXg1DX3YVmPYt1
     
-    // 24 Hours Logic Settings
-    const ACCESS_KEY = "yoddha_granted_v1";
-    const TIME_KEY = "yoddha_time_v1";
-    const EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 Ghante
-
-    async function loadStream() {
-      try {
-        const response = await fetch(JSON_URL);
-        const data = await response.json();
-        document.getElementById('main-player').src = data.channels[CURRENT_CHANNEL_ID];
-      } catch (e) { console.error("Error loading stream"); }
+    // Yahan apna player base URL daalein agar videoId sirf ID hai
+    if(videoId) {
+        document.getElementById('main-player').src = "https://crickly.vercel.app/player2.html?id=" + videoId;
     }
+
+    // 24 Hours Logic
+    const TIME_KEY = "yoddha_join_time";
+    const EXPIRY = 24 * 60 * 60 * 1000; 
 
     function checkAccess() {
       const savedTime = localStorage.getItem(TIME_KEY);
       const now = new Date().getTime();
 
-      if (savedTime && (now - savedTime < EXPIRY_TIME)) {
-        // Access granted, do nothing
-      } else {
-        // Access expired or never granted
+      if (!savedTime || (now - savedTime > EXPIRY)) {
         document.getElementById('main-stage').classList.add('locked');
         document.getElementById('forcePop').classList.add('active');
       }
     }
 
     function verifyAccess() {
-      localStorage.setItem(ACCESS_KEY, 'true');
       localStorage.setItem(TIME_KEY, new Date().getTime());
       document.getElementById('forcePop').classList.remove('active');
       document.getElementById('main-stage').classList.remove('locked');
     }
 
-    window.onload = () => {
-      loadStream();
-      checkAccess();
-    };
+    window.onload = checkAccess;
 
     function shareLink() {
       if (navigator.share) navigator.share({title:'Cricket Yoddha', url:window.location.href});
-      else alert("Link Copied!");
     }
 
     // Firebase Stats
     const firebaseConfig = { apiKey: "AIzaSyA-vR50CMDYJVHApJir-6fmgRqhFiqQDU8", authDomain: "my-website-cricket.firebaseapp.com", databaseURL: "https://my-website-cricket-default-rtdb.firebaseio.com", projectId: "my-website-cricket" };
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const ref = firebase.database().ref('live_users/' + DB_NAME + '/' + new Date().toISOString().slice(0, 10));
+    const ref = firebase.database().ref('live_users/yoddha/' + new Date().toISOString().slice(0, 10));
     ref.transaction(v => (v || 0) + 1);
     ref.on('value', snap => { document.getElementById('live-count').innerText = (snap.val() || 0).toLocaleString(); });
   </script>
