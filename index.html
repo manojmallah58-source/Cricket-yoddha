@@ -4,81 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer">
-    <title>Live Player</title>
+    <title>Live Stream</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
-
+    
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            background: black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
-
-        #player-container {
-            width: 100%;
-            max-width: 1000px;
-        }
-
-        #plyr-player {
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            background: black;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+        .wrapper { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; }
+        #player { width: 100%; max-width: 1000px; aspect-ratio: 16/9; }
     </style>
 </head>
 <body>
 
-    <div id="player-container">
-        <video id="plyr-player" controls playsinline></video>
+    <div class="wrapper">
+        <video id="player" controls playsinline></video>
     </div>
 
-    <script>
-        function getQueryParam(param) {
-            return new URLSearchParams(window.location.search).get(param);
-        }
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
-        const videoSrc = getQueryParam('url');
-        const video = document.getElementById('plyr-player');
+    <script>
+        const video = document.getElementById('player');
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoSrc = urlParams.get('url');
 
         if (videoSrc) {
             if (Hls.isSupported()) {
-                const hls = new Hls();
+                const hls = new Hls({
+                    lowLatencyMode: true, // Low latency mode for faster start
+                    manifestLoadingTimeOut: 10000,
+                });
                 hls.loadSource(videoSrc);
                 hls.attachMedia(video);
-
-                hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    const availableQualities = hls.levels
-                        .map(l => l.height)
-                        .filter((v, i, a) => a.indexOf(v) === i)
-                        .sort((a, b) => b - a);
-
-                    const player = new Plyr(video, {
-                        autoplay: true,
-                        muted: true,
-                        settings: ['quality', 'speed', 'loop'],
-                        quality: {
-                            default: availableQualities[0],
-                            options: availableQualities,
-                            forced: true,
-                            onChange: (newQuality) => {
-                                hls.levels.forEach((level, index) => {
-                                    if (level.height === newQuality) hls.currentLevel = index;
-                                });
-                            }
-                        }
-                    });
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    const player = new Plyr(video, { autoplay: true, muted: true });
                 });
-            } else {
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = videoSrc;
-                new Plyr(video, { autoplay: true, muted: true });
             }
         }
     </script>
