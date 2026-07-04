@@ -4,16 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer">
-    <title>Fast Live Player</title>
+    <title>Live Stream</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js" defer></script>
 
     <style>
-        html, body { margin: 0; padding: 0; height: 100%; background: black; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #player-container { width: 100%; max-width: 1000px; }
-        #plyr-player { width: 100%; aspect-ratio: 16 / 9; background: black; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #player-container {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        #plyr-player {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+        }
     </style>
 </head>
 <body>
@@ -23,48 +42,41 @@
     </div>
 
     <script>
-        const videoSrc = new URLSearchParams(window.location.search).get('url');
-        const video = document.getElementById('plyr-player');
+        // Page load hone ke baad script execute hogi
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const videoSrc = urlParams.get('url');
+            const video = document.getElementById('plyr-player');
 
-        if (videoSrc) {
-            if (Hls.isSupported()) {
-                // Optimized HLS Config for Fast Loading
-                const hls = new Hls({
-                    lowLatencyMode: true,
-                    backBufferLength: 0,
-                    maxBufferLength: 30, // Kam buffer limit taaki jaldi start ho
-                    maxMaxBufferLength: 50,
-                    startLevel: 0 // Sabse pehle low quality load hogi taaki fast start ho
-                });
-
-                hls.loadSource(videoSrc);
-                hls.attachMedia(video);
-
-                hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                    const availableQualities = hls.levels.map(l => l.height).sort((a, b) => b - a);
-
-                    const player = new Plyr(video, {
-                        autoplay: true,
-                        muted: true,
-                        settings: ['quality', 'speed', 'loop'],
-                        quality: {
-                            default: availableQualities[0],
-                            options: availableQualities,
-                            forced: true,
-                            onChange: (newQuality) => {
-                                hls.levels.forEach((level, index) => {
-                                    if (level.height === newQuality) hls.currentLevel = index;
-                                });
+            if (videoSrc) {
+                if (Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(videoSrc);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                        const availableQualities = hls.levels.map(l => l.height).sort((a, b) => b - a);
+                        new Plyr(video, {
+                            autoplay: true,
+                            muted: true,
+                            settings: ['quality', 'speed', 'loop'],
+                            quality: {
+                                default: availableQualities[0],
+                                options: availableQualities,
+                                forced: true,
+                                onChange: (newQuality) => {
+                                    hls.levels.forEach((level, index) => {
+                                        if (level.height === newQuality) hls.currentLevel = index;
+                                    });
+                                }
                             }
-                        }
+                        });
                     });
-                    video.play();
-                });
-            } else {
-                video.src = videoSrc;
-                new Plyr(video, { autoplay: true, muted: true });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = videoSrc;
+                    new Plyr(video, { autoplay: true, muted: true });
+                }
             }
-        }
+        });
     </script>
 </body>
 </html>
