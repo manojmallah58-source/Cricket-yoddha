@@ -1,44 +1,86 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Player</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.0/controls.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.0/shaka-player.ui.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer">
+    <title>Live Player</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+
     <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .shaka-video-container { width: 100%; max-width: 800px; }
-        video { width: 100%; height: auto; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #player-container {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        #plyr-player {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: black;
+        }
     </style>
 </head>
 <body>
 
-<div class="shaka-video-container" id="video-container">
-    <video id="video" playsinline></video>
-</div>
+    <div id="player-container">
+        <video id="plyr-player" controls playsinline></video>
+    </div>
 
-<script>
-    const video = document.getElementById('video');
-    const videoContainer = document.getElementById('video-container');
-    const player = new shaka.Player(video);
-    
-    // Shaka UI Initialize
-    const ui = new shaka.ui.Overlay(player, videoContainer, video);
-    const controls = ui.getControls();
+    <script>
+        function getQueryParam(param) {
+            return new URLSearchParams(window.location.search).get(param);
+        }
 
-    // DRM Configuration
-    player.configure({
-        drm: { clearKeys: { '71719eea0bbb5319a4e854ac52ea7871': '752ed8f45c43ed858af4c1716c05241a' } }
-    });
+        const videoSrc = getQueryParam('url');
+        const video = document.getElementById('plyr-player');
 
-    // Load Stream
-    async function init() {
-        try {
-            await player.load('YOUR_STREAM_URL_HERE');
-        } catch (e) { console.error(e); }
-    }
+        if (videoSrc) {
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(videoSrc);
+                hls.attachMedia(video);
 
-    init();
-</script>
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    const availableQualities = hls.levels
+                        .map(l => l.height)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .sort((a, b) => b - a);
+
+                    const player = new Plyr(video, {
+                        autoplay: true,
+                        muted: true,
+                        settings: ['quality', 'speed', 'loop'],
+                        quality: {
+                            default: availableQualities[0],
+                            options: availableQualities,
+                            forced: true,
+                            onChange: (newQuality) => {
+                                hls.levels.forEach((level, index) => {
+                                    if (level.height === newQuality) hls.currentLevel = index;
+                                });
+                            }
+                        }
+                    });
+                });
+            } else {
+                video.src = videoSrc;
+                new Plyr(video, { autoplay: true, muted: true });
+            }
+        }
+    </script>
 </body>
 </html>
