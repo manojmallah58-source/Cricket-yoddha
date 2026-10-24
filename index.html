@@ -37,7 +37,6 @@
             background: black;
         }
 
-        /* Hide any default poster or flash */
         .plyr__poster {
             background-color: black !important;
         }
@@ -46,7 +45,6 @@
 <body>
 
     <div id="player-container">
-        <!-- Added preload="auto" for instant buffering start -->
         <video id="plyr-player" controls playsinline muted autoplay preload="auto"></video>
     </div>
 
@@ -55,48 +53,57 @@
         const video = document.getElementById('plyr-player');
 
         if (videoSrc) {
-            // 1. Initialize Plyr instantly so the UI is ready without waiting
+            // 1. Initialize Plyr instantly with Quality, Speed & Loop buttons enabled
             const player = new Plyr(video, {
                 autoplay: true,
                 muted: true,
-                settings: ['quality', 'speed', 'loop']
+                settings: ['quality', 'speed', 'loop'],
+                speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+                quality: {
+                    default: 720,
+                    options: [1080, 720, 480, 360], // Initial placeholders so buttons render immediately
+                    forced: true,
+                    onChange: (newQuality) => {
+                        if (window.hlsInstance) {
+                            window.hlsInstance.levels.forEach((level, index) => {
+                                if (level.height === newQuality) window.hlsInstance.currentLevel = index;
+                            });
+                        }
+                    }
+                }
             });
 
             if (Hls.isSupported()) {
                 const hls = new Hls({
-                    liveSyncDurationCount: 0, // Zero delay for live sync
+                    liveSyncDurationCount: 0,
                     lowLatencyMode: true,
                     enableWorker: true,
                     fragLoadingTimeOut: 20000,
                     manifestLoadingTimeOut: 10000
                 });
 
+                window.hlsInstance = hls; // Store globally for quality change handler
+
                 hls.loadSource(videoSrc);
                 hls.attachMedia(video);
 
-                // Play immediately as soon as media is attached
+                // Play instantly
                 video.play().catch(() => {});
 
-                // Update qualities dynamically once parsed in background
+                // Update real qualities dynamically once manifest is parsed
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     const availableQualities = hls.levels
                         .map(l => l.height)
                         .filter((v, i, a) => a.indexOf(v) === i)
                         .sort((a, b) => b - a);
 
-                    player.config.quality = {
-                        default: availableQualities[0] || 0,
-                        options: availableQualities,
-                        forced: true,
-                        onChange: (newQuality) => {
-                            hls.levels.forEach((level, index) => {
-                                if (level.height === newQuality) hls.currentLevel = index;
-                            });
-                        }
-                    };
+                    if (availableQualities.length > 0) {
+                        player.config.quality.options = availableQualities;
+                        player.config.quality.default = availableQualities[0];
+                    }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Native Safari support
+                // Safari / iOS Native support
                 video.src = videoSrc;
                 video.play().catch(() => {});
             } else {
