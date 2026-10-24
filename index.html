@@ -6,13 +6,13 @@
     <meta name="referrer" content="no-referrer">
     <title>Live Player</title>
 
-    <!-- Preconnect for faster CDN loading -->
+    <!-- Preconnect for instant network response -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
 
     <style>
         html, body {
@@ -37,7 +37,7 @@
             background: black;
         }
 
-        /* Hide unwanted loading overlay/spinner in plyr for instant look */
+        /* Hide any default poster or flash */
         .plyr__poster {
             background-color: black !important;
         }
@@ -46,68 +46,64 @@
 <body>
 
     <div id="player-container">
-        <video id="plyr-player" controls playsinline muted autoplay></video>
+        <!-- Added preload="auto" for instant buffering start -->
+        <video id="plyr-player" controls playsinline muted autoplay preload="auto"></video>
     </div>
 
     <script>
-        window.addEventListener('DOMContentLoaded', () => {
-            const videoSrc = new URLSearchParams(window.location.search).get('url');
-            const video = document.getElementById('plyr-player');
+        const videoSrc = new URLSearchParams(window.location.search).get('url');
+        const video = document.getElementById('plyr-player');
 
-            if (!videoSrc) return;
+        if (videoSrc) {
+            // 1. Initialize Plyr instantly so the UI is ready without waiting
+            const player = new Plyr(video, {
+                autoplay: true,
+                muted: true,
+                settings: ['quality', 'speed', 'loop']
+            });
 
-            // Fast initialization function
-            const initPlayer = () => {
-                if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        liveSyncDurationCount: 1, // Ultra-fast live start
-                        maxLiveSyncPlaybackRate: 1.5,
-                        enableWorker: true,
-                        lowLatencyMode: true
-                    });
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    liveSyncDurationCount: 0, // Zero delay for live sync
+                    lowLatencyMode: true,
+                    enableWorker: true,
+                    fragLoadingTimeOut: 20000,
+                    manifestLoadingTimeOut: 10000
+                });
 
-                    hls.loadSource(videoSrc);
-                    hls.attachMedia(video);
+                hls.loadSource(videoSrc);
+                hls.attachMedia(video);
 
-                    hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                        const availableQualities = hls.levels
-                            .map(l => l.height)
-                            .filter((v, i, a) => a.indexOf(v) === i)
-                            .sort((a, b) => b - a);
+                // Play immediately as soon as media is attached
+                video.play().catch(() => {});
 
-                        const player = new Plyr(video, {
-                            autoplay: true,
-                            muted: true,
-                            settings: ['quality', 'speed', 'loop'],
-                            quality: {
-                                default: availableQualities[0] || 0,
-                                options: availableQualities,
-                                forced: true,
-                                onChange: (newQuality) => {
-                                    hls.levels.forEach((level, index) => {
-                                        if (level.height === newQuality) hls.currentLevel = index;
-                                    });
-                                }
-                            }
-                        });
+                // Update qualities dynamically once parsed in background
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    const availableQualities = hls.levels
+                        .map(l => l.height)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .sort((a, b) => b - a);
 
-                        // Ensure playback starts immediately
-                        video.play().catch(() => {});
-                    });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    // Native HLS support (Safari / iOS)
-                    video.src = videoSrc;
-                    new Plyr(video, { autoplay: true, muted: true });
-                    video.play().catch(() => {});
-                } else {
-                    video.src = videoSrc;
-                    new Plyr(video, { autoplay: true, muted: true });
-                }
-            };
-
-            // Run instantly
-            initPlayer();
-        });
+                    player.config.quality = {
+                        default: availableQualities[0] || 0,
+                        options: availableQualities,
+                        forced: true,
+                        onChange: (newQuality) => {
+                            hls.levels.forEach((level, index) => {
+                                if (level.height === newQuality) hls.currentLevel = index;
+                            });
+                        }
+                    };
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native Safari support
+                video.src = videoSrc;
+                video.play().catch(() => {});
+            } else {
+                video.src = videoSrc;
+                video.play().catch(() => {});
+            }
+        }
     </script>
 </body>
 </html>
