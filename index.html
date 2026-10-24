@@ -53,15 +53,14 @@
         const video = document.getElementById('plyr-player');
 
         if (videoSrc) {
-            // 1. Initialize Plyr instantly with Quality, Speed & Loop buttons enabled
+            // Initialize Plyr with standard settings (Normal speed by default)
             const player = new Plyr(video, {
                 autoplay: true,
                 muted: true,
                 settings: ['quality', 'speed', 'loop'],
-                speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
                 quality: {
                     default: 720,
-                    options: [1080, 720, 480, 360], // Initial placeholders so buttons render immediately
+                    options: [1080, 720, 480, 360],
                     forced: true,
                     onChange: (newQuality) => {
                         if (window.hlsInstance) {
@@ -82,15 +81,15 @@
                     manifestLoadingTimeOut: 10000
                 });
 
-                window.hlsInstance = hls; // Store globally for quality change handler
+                window.hlsInstance = hls;
 
                 hls.loadSource(videoSrc);
                 hls.attachMedia(video);
 
-                // Play instantly
+                // Instant normal playback
+                video.playbackRate = 1.0;
                 video.play().catch(() => {});
 
-                // Update real qualities dynamically once manifest is parsed
                 hls.on(Hls.Events.MANIFEST_PARSED, function () {
                     const availableQualities = hls.levels
                         .map(l => l.height)
@@ -103,11 +102,12 @@
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Safari / iOS Native support
                 video.src = videoSrc;
+                video.playbackRate = 1.0;
                 video.play().catch(() => {});
             } else {
                 video.src = videoSrc;
+                video.playbackRate = 1.0;
                 video.play().catch(() => {});
             }
         }
