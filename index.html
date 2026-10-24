@@ -6,6 +6,10 @@
     <meta name="referrer" content="no-referrer">
     <title>Live Player</title>
 
+    <!-- Preconnect for faster CDN loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js" defer></script>
@@ -32,23 +36,36 @@
             aspect-ratio: 16 / 9;
             background: black;
         }
+
+        /* Hide unwanted loading overlay/spinner in plyr for instant look */
+        .plyr__poster {
+            background-color: black !important;
+        }
     </style>
 </head>
 <body>
 
     <div id="player-container">
-        <video id="plyr-player" controls playsinline></video>
+        <video id="plyr-player" controls playsinline muted autoplay></video>
     </div>
 
     <script>
-        // DOM content load hone ka wait karein taaki rendering fast ho
         window.addEventListener('DOMContentLoaded', () => {
             const videoSrc = new URLSearchParams(window.location.search).get('url');
             const video = document.getElementById('plyr-player');
 
-            if (videoSrc) {
+            if (!videoSrc) return;
+
+            // Fast initialization function
+            const initPlayer = () => {
                 if (Hls.isSupported()) {
-                    const hls = new Hls();
+                    const hls = new Hls({
+                        liveSyncDurationCount: 1, // Ultra-fast live start
+                        maxLiveSyncPlaybackRate: 1.5,
+                        enableWorker: true,
+                        lowLatencyMode: true
+                    });
+
                     hls.loadSource(videoSrc);
                     hls.attachMedia(video);
 
@@ -58,12 +75,12 @@
                             .filter((v, i, a) => a.indexOf(v) === i)
                             .sort((a, b) => b - a);
 
-                        new Plyr(video, {
+                        const player = new Plyr(video, {
                             autoplay: true,
                             muted: true,
                             settings: ['quality', 'speed', 'loop'],
                             quality: {
-                                default: availableQualities[0],
+                                default: availableQualities[0] || 0,
                                 options: availableQualities,
                                 forced: true,
                                 onChange: (newQuality) => {
@@ -73,12 +90,23 @@
                                 }
                             }
                         });
+
+                        // Ensure playback starts immediately
+                        video.play().catch(() => {});
                     });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Native HLS support (Safari / iOS)
+                    video.src = videoSrc;
+                    new Plyr(video, { autoplay: true, muted: true });
+                    video.play().catch(() => {});
                 } else {
                     video.src = videoSrc;
                     new Plyr(video, { autoplay: true, muted: true });
                 }
-            }
+            };
+
+            // Run instantly
+            initPlayer();
         });
     </script>
 </body>
